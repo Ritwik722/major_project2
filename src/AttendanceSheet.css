@@ -1,0 +1,68 @@
+.container {
+    max-width: 800px;
+    margin: auto;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  .search-bar {
+    margin-bottom: 16px;
+  }
+  
+  .search-input {
+    width: 100%;
+    padding: 8px;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+  }
+  
+  .attendance-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .attendance-table th,
+  .attendance-table td {
+    border: 1px solid #ccc;
+    padding: 8px;
+  }
+  
+  .actions button {
+    margin-right: 8px;
+  }
+  
+  .dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+  }
+  
+  .dialog-content {
+     background-color: white;
+     padding:16px;
+     max-width:400px;
+     margin:auto;
+     margin-top:auto; /* Center vertically */
+  }
+  
+  .not-captured {
+     color: gray;
+  }
+  
+  .photo,
+  .signature,
+  .large-photo,
+  .large-signature {
+     max-width:100%;
+     height:auto; /* Maintain aspect ratio */
+  }
+  

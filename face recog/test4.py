@@ -1,0 +1,104 @@
+# Import necessary libraries //MANUALLY WLA HAI//
+import os
+import numpy as np
+from deepface import DeepFace
+import pymongo
+
+# MongoDB Setup
+mongo_uri = "mongodb+srv://ritwiksuneliya:Ritwik123@cluster0.4o02p.mongodb.net/attendance-system?retryWrites=true&w=majority"
+db_name = "attendance-system"  # Database where embeddings are stored
+collection_name = "face_embeddings"  # Collection to store embeddings
+threshold = 0.75  # Cosine similarity threshold for face similarity matching
+
+# Establish MongoDB connection
+client = pymongo.MongoClient(mongo_uri)
+db = client[db_name]
+embeddings_collection = db[collection_name]
+
+def get_face_embedding(image_path):
+    """
+    Extract face embedding using DeepFace's built-in detection with enhanced debugging.
+    """
+    try:
+        print(f"Processing image: {image_path}")
+        
+        # Check if the file exists
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image path '{image_path}' does not exist.")
+        
+        # Generate embedding
+        embedding = DeepFace.represent(
+            img_path=image_path,
+            model_name="Facenet",
+            detector_backend="mtcnn",
+            enforce_detection=True
+        )
+        print("Embedding generated successfully.\n")
+        return np.array(embedding[0]['embedding'])
+    except Exception as e:
+        print(f"Error during embedding generation: {e}\n")
+        return None
+
+def calculate_cosine_similarity(vec1, vec2):
+    """
+    Calculate the cosine similarity between two vectors.
+    """
+    dot_product = np.dot(vec1, vec2)
+    norm_vec1 = np.linalg.norm(vec1)
+    norm_vec2 = np.linalg.norm(vec2)
+    if norm_vec1 == 0 or norm_vec2 == 0:
+        return 0.0
+    return dot_product / (norm_vec1 * norm_vec2)
+
+def recognize_face_in_database(check_embedding, threshold=0.75):
+    """
+    Compare the input face embedding with stored embeddings in MongoDB.
+    Returns the best match within the threshold along with similarity metrics.
+    """
+    best_similarity = -1  # Initialize with the lowest possible similarity
+    best_match = None
+
+    print("Comparing with stored embeddings...\n")
+
+    # Retrieve all stored embeddings
+    for record in embeddings_collection.find({}, {"filename": 1, "embedding": 1}):
+        stored_embedding = np.array(record["embedding"])
+        similarity = calculate_cosine_similarity(check_embedding, stored_embedding)
+        
+        print(f"Comparing with '{record['filename']}':")
+        print(f"Stored Embedding: {stored_embedding}")
+        print(f"Cosine Similarity: {similarity:.4f}\n")
+
+        # Update the best match if this similarity is higher
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_match = record
+
+    # Check if the best match is within the threshold
+    if best_similarity >= threshold:
+        print(f"Best Match Found: '{best_match['filename']}'")
+        print(f"Best Cosine Similarity: {best_similarity:.4f}\n")
+        return best_match, best_similarity
+    else:
+        print("No matching face found in the database within the threshold.\n")
+        return None, None
+
+# Path to the image you want to check
+image_path_to_check = "sam2.jpeg"  # Replace with the actual path to the image
+
+# Generate embedding for the input image
+check_embedding = get_face_embedding(image_path_to_check)
+
+if check_embedding is not None:
+    print("--- Input Image Embedding ---")
+    print(check_embedding, "\n")  # Print the embedding vector of the input image
+    
+    # Compare with stored embeddings
+    match_doc, similarity = recognize_face_in_database(check_embedding, threshold)
+    if match_doc is not None:
+        print(f"Face matches with filename: '{match_doc['filename']}'")
+        print(f"Similarity Score (Cosine Similarity): {similarity:.3f}")
+    else:
+        print("No matching face found in the database.")
+else:
+    print("No face found in the input image.")

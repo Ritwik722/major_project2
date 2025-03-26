@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Digital Signature Pad</title>
+    <style>
+        .signature-container {
+            width: 400px;
+            margin: 20px auto;
+        }
+        #signature-pad {
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+        .controls {
+            margin-top: 10px;
+        }
+        button {
+            padding: 5px 10px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="signature-container">
+        <h2>Student Digital Signature</h2>
+        <canvas id="signature-pad" width="400" height="200"></canvas>
+        <div class="controls">
+            <button id="clear">Clear</button>
+            <button id="save">Save Signature</button>
+            <button id="verify">Verify Signature</button>
+        </div>
+        <div id="status"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('signature-pad');
+            const signaturePad = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(0, 0, 0)'
+            });
+            
+            // Clear button
+            document.getElementById('clear').addEventListener('click', function() {
+                signaturePad.clear();
+            });
+            
+            // Save button
+            document.getElementById('save').addEventListener('click', function() {
+                if (signaturePad.isEmpty()) {
+                    alert('Please provide a signature first.');
+                    return;
+                }
+                
+                // Get signature as data URL (PNG format by default)
+                const signatureData = signaturePad.toDataURL();
+                
+                // Send to backend for signing
+                const studentId = prompt("Enter your student ID:");
+                if (!studentId) return;
+                
+                // Create form data to send to server
+                const formData = new FormData();
+                formData.append('student_id', studentId);
+                formData.append('signature_image', signatureData);
+                
+                fetch('/sign-signature', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('status').innerHTML = 
+                            '<p style="color: green;">Signature saved and digitally signed successfully!</p>';
+                    } else {
+                        document.getElementById('status').innerHTML = 
+                            '<p style="color: red;">Error: ' + data.error + '</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('status').innerHTML = 
+                        '<p style="color: red;">Failed to save signature</p>';
+                });
+            });
+            
+            // Verify button
+            document.getElementById('verify').addEventListener('click', function() {
+                const studentId = prompt("Enter student ID to verify:");
+                if (!studentId) return;
+                
+                if (signaturePad.isEmpty()) {
+                    alert('Please provide a signature to verify.');
+                    return;
+                }
+                
+                const signatureData = signaturePad.toDataURL();
+                
+                const formData = new FormData();
+                formData.append('student_id', studentId);
+                formData.append('signature_image', signatureData);
+                
+                fetch('/verify-signature', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.valid) {
+                        document.getElementById('status').innerHTML = 
+                            '<p style="color: green;">✓ Signature is valid!</p>';
+                    } else {
+                        document.getElementById('status').innerHTML = 
+                            '<p style="color: red;">✗ Signature is invalid!</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('status').innerHTML = 
+                        '<p style="color: red;">Verification failed</p>';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
