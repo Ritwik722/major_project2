@@ -3,6 +3,31 @@ const bcrypt = require('bcryptjs');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
 
+exports.loginTeacher = async (req, res) => {
+  try {
+    const { employeeId, password } = req.body;
+
+    // Check if teacher exists
+    const teacher = await Teacher.findOne({ employeeId });
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Teacher not found' });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, teacher.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ id: teacher._id, role: 'teacher' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.status(200).json({ success: true, token, message: 'Login successful' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // Generate JWT Token
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {

@@ -17,7 +17,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
           },
         });
         const data = await response.json();
-        setRooms(data);
+        setRooms(Array.isArray(data) ? data : data.rooms || []);
       } catch (error) {
         console.error("Error fetching rooms:", error);
       }
@@ -26,7 +26,6 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
     fetchRooms();
   }, []);
 
-  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
@@ -37,7 +36,6 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
     return end - start + 1;
   };
 
-  // Add a new room
   const handleAddRoom = async () => {
     if (form.number && form.range) {
       const capacity = calculateCapacity(form.range);
@@ -55,7 +53,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
           body: JSON.stringify(form),
         });
         const newRoom = await response.json();
-        setRooms([...rooms, newRoom]);
+        setRooms((prevRooms) => [...prevRooms, newRoom]);
         setForm({ number: "", range: "" });
       } catch (error) {
         console.error("Error adding room:", error);
@@ -63,14 +61,12 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
     }
   };
 
-  // Open edit modal
   const handleEditRoom = (room) => {
     setEditRoom(room);
     setForm({ number: room.number, range: room.range });
     setShowModal(true);
   };
 
-  // Save edited room
   const handleSaveEdit = async () => {
     const capacity = calculateCapacity(form.range);
     if (capacity > 50) {
@@ -87,10 +83,8 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
         body: JSON.stringify(form),
       });
       const updatedRoom = await response.json();
-      setRooms(
-        rooms.map((room) =>
-          room._id === editRoom._id ? updatedRoom : room
-        )
+      setRooms((prevRooms) =>
+        prevRooms.map((room) => (room._id === editRoom._id ? updatedRoom : room))
       );
       setEditRoom(null);
       setShowModal(false);
@@ -100,7 +94,6 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
     }
   };
 
-  // Delete a room
   const handleDeleteRoom = async (roomId) => {
     if (window.confirm("Are you sure you want to delete this room?")) {
       try {
@@ -110,27 +103,23 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setRooms(rooms.filter((room) => room._id !== roomId));
+        setRooms((prevRooms) => prevRooms.filter((room) => room._id !== roomId));
       } catch (error) {
         console.error("Error deleting room:", error);
       }
     }
   };
 
-  // Handle view attendance
   const handleViewAttendance = (range) => {
     if (onOpenAttendanceSheet) {
-      onOpenAttendanceSheet(range); // Pass the range to the parent component
+      onOpenAttendanceSheet(range);
     }
   };
 
-  // Filter rooms based on search term
-  const filteredRooms = rooms.filter(
-    (room) =>
-      room.number.toString().includes(searchTerm) ||
-      room.range.includes(searchTerm)
-  );
-
+  const filteredRooms = Array.isArray(rooms) ? rooms.filter(
+    (room) => room?.number?.toString().includes(searchTerm) || room?.range?.includes(searchTerm)
+  ) : [];
+  
   return (
     <div style={styles.container}>
       <h1>Room List</h1>

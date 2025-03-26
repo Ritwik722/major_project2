@@ -2,6 +2,45 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const Room = require('../models/Room');
 
+
+
+exports.registerTeacher = async (req, res) => {
+  try {
+    const { employeeId, email } = req.body;
+
+    // Check if teacher already exists
+    const teacherExists = await Teacher.findOne({ 
+      $or: [{ employeeId }, { email }] 
+    });
+
+    if (teacherExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Teacher already exists with this employee ID or email',
+      });
+    }
+
+    const teacher = await Teacher.create(req.body);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        _id: teacher._id,
+        name: teacher.name,
+        employeeId: teacher.employeeId,
+        email: teacher.email,
+      },
+      message: 'Teacher registered successfully!',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message,
+    });
+  }
+};
+
 // Get Teacher Profile
 exports.getTeacherProfile = async (req, res) => {
   try {

@@ -16,6 +16,14 @@ const isTeacher = (req, res, next) => {
   }
 };
 
+const { loginTeacher } = require('../controllers/authController');
+
+// Teacher login route
+router.post('/login', loginTeacher);
+
+router.post('/register', teacherController.registerTeacher);
+
+
 // Teacher Profile Routes
 router.get('/profile', auth, isTeacher, teacherController.getTeacherProfile);
 router.put('/profile', auth, isTeacher, teacherController.updateTeacherProfile);
