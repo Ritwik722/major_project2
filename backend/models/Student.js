@@ -63,6 +63,6 @@ studentSchema.pre('save', async function (next) {
 
 studentSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
-};
+}
 
 module.exports = mongoose.model('Student', studentSchema);

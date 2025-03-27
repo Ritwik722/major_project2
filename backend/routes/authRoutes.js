@@ -13,6 +13,10 @@ router.post('/register/student',
 
 router.post('/login', authController.login);
 
+router.get('/students', authController.getAllStudents);
+
+
+
 // Protected Routes
 router.get('/me', auth, authController.getCurrentUser);
 router.put('/change-password', auth, authController.changePassword);

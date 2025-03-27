@@ -20,16 +20,17 @@ client = pymongo.MongoClient(mongo_uri)
 db = client[db_name]
 embeddings_collection = db[collection_name]
 
-def capture_image(auto_capture_delay=15):
+def capture_image(auto_capture_delay=15, save_path="C:\\Users\\RITHWIK\\Desktop\\Major_Project\\face_recog\\db_images"):
     """
-    Capture an image automatically using the computer's default camera and save it temporarily.
+    Capture an image using the computer's default camera and save it to the specified directory.
     Returns the path to the captured image.
-    
+
     Parameters:
     - auto_capture_delay (int): Time in seconds to wait before capturing the image.
+    - save_path (str): Path where the image will be saved.
     """
     try:
-        # Initialize the webcam (0 is usually the default camera)
+        # Initialize the webcam
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             raise Exception("Could not open video device")
@@ -44,28 +45,28 @@ def capture_image(auto_capture_delay=15):
         if not ret:
             print("Failed to capture image from camera.")
             cap.release()
-            cv2.destroyAllWindows()
             return None
 
-        # Optionally, display the captured frame for a brief moment (not required)
-        # cv2.imshow('Captured Image', frame)
-        # cv2.waitKey(1000)  # Display for 1 second
-        # cv2.destroyAllWindows()
+        # Ensure the save directory exists
+        os.makedirs(save_path, exist_ok=True)
 
-        # Create a temporary file to save the captured image
-        temp_dir = tempfile.gettempdir()
-        temp_image_path = os.path.join(temp_dir, "captured_image.png")
-        cv2.imwrite(temp_image_path, frame)
-        print(f"Image captured and saved to {temp_image_path}\n")
+        # Generate a unique filename using timestamp
+        filename = f"captured_image_{int(time.time())}.png"
+        image_path = os.path.join(save_path, filename)
+
+        # Save the image
+        cv2.imwrite(image_path, frame)
+        print(f"Image captured and saved to {image_path}\n")
 
         # Release the camera
         cap.release()
 
-        return temp_image_path
+        return image_path
     except Exception as e:
         print(f"Error during image capture: {e}\n")
         return None
-
+    
+    
 def get_face_embedding(image_path):
     """
     Extract face embedding using DeepFace's built-in detection with enhanced debugging.

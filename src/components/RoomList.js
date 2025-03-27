@@ -50,7 +50,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, capacity }), // Add capacity
         });
         const newRoom = await response.json();
         setRooms((prevRooms) => [...prevRooms, newRoom]);
@@ -80,7 +80,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, capacity }), // Add capacity
       });
       const updatedRoom = await response.json();
       setRooms((prevRooms) =>
@@ -93,6 +93,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
       console.error("Error updating room:", error);
     }
   };
+  
 
   const handleDeleteRoom = async (roomId) => {
     if (window.confirm("Are you sure you want to delete this room?")) {

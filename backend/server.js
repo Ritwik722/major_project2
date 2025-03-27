@@ -11,6 +11,17 @@ const teacherRoutes = require('./routes/teacherRoutes');
 
 const app = express();
 
+const mongoose = require('mongoose');
+
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('MongoDB connected'))
+  .catch((err) => console.error('MongoDB connection error:', err));
+
+
 // Connect to MongoDB
 connectDB();
 
@@ -26,6 +37,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/teachers', teacherRoutes);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

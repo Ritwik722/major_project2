@@ -3,6 +3,27 @@ const bcrypt = require('bcryptjs');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
 
+
+// Fetch All Students
+exports.getAllStudents = async (req, res) => {
+  try {
+    // Fetch all students from the database
+    const students = await Student.find();
+
+    // Return the list of students
+    res.status(200).json({
+      success: true,
+      data: students,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch students',
+      error: error.message,
+    });
+  }
+};
+
 exports.loginTeacher = async (req, res) => {
   try {
     const { employeeId, password } = req.body;
@@ -195,4 +216,19 @@ exports.changePassword = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+exports.deleteStudent = async (req, res) => {
+    try {
+        const { enrollmentNumber } = req.params;
+        const deletedStudent = await Student.findOneAndDelete({ enrollmentNumber });
+        
+        if (!deletedStudent) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        res.json({ success: true, message: "Student deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 };

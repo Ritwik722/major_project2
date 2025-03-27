@@ -43,35 +43,47 @@ const uploadSignature = async (file) => {
 };
 
 const AttendanceSheet = () => {
-  const [students, setStudents] = useState(() => {
-    const savedStudents = JSON.parse(localStorage.getItem("students")) || [];
-    if (savedStudents.length > 0) return savedStudents;
-
-    return [
-      {
-        enrollmentNumber: "ENR001",
-        name: "John Doe",
-        course: "Computer Science",
-        department: "Engineering",
-        photo: "",
-        signature: "",
-      },
-      {
-        enrollmentNumber: "ENR002",
-        name: "Jane Smith",
-        course: "Mechanical Engineering",
-        department: "Engineering",
-        photo: "",
-        signature: "",
-      },
-    ];
-  });
-
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [modalType, setModalType] = useState(""); // 'view', 'capture', 'edit'
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Add fetch function for getting students from MongoDB
+  const fetchStudents = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/students", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch students");
+      }
+      const result = await response.json();
+
+      // Ensure the data is an array
+      if (result.success && Array.isArray(result.data)) {
+        setStudents(result.data); // Set the students state to the array
+      } else {
+        throw new Error("Invalid response format");
+      }
+  
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // Use useEffect to fetch students when component mounts
+  useEffect(() => {
+    fetchStudents();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("students", JSON.stringify(students));
@@ -104,15 +116,39 @@ const AttendanceSheet = () => {
     setSelectedStudent((prev) => ({ ...prev, [name]: value }));
   };
 
-  const saveChanges = () => {
-    setStudents((prevStudents) =>
-      prevStudents.map((student) =>
-        student.enrollmentNumber === selectedStudent.enrollmentNumber
-          ? selectedStudent
-          : student
-      )
-    );
-    closeModal();
+  const saveChanges = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/students/update/${selectedStudent.enrollmentNumber}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(selectedStudent),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to update student');
+      }
+  
+      const result = await response.json();
+      
+      // Update the local state
+      setStudents(prevStudents =>
+        prevStudents.map(student =>
+          student.enrollmentNumber === selectedStudent.enrollmentNumber
+            ? selectedStudent
+            : student
+        )
+      );
+  
+      setSuccessMessage('Student updated successfully');
+      setTimeout(() => {
+        closeModal();
+      }, 1500);
+  
+    } catch (error) {
+      setError(error.message);
+    }
   };
 
   const handleCapturePhoto = async (e) => {
@@ -147,9 +183,33 @@ const AttendanceSheet = () => {
     }
   };
 
+  const deleteStudent = async (enrollmentNumber) => {
+    if (window.confirm('Are you sure you want to delete this student?')) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/students/${enrollmentNumber}`, {
+          method: 'DELETE',
+        });
+  
+        if (!response.ok) {
+          throw new Error('Failed to delete student');
+        }
+  
+        setStudents(prevStudents => 
+          prevStudents.filter(student => student.enrollmentNumber !== enrollmentNumber)
+        );
+        setSuccessMessage('Student deleted successfully');
+      } catch (error) {
+        setError(error.message);
+      }
+    }
+  };
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Attendance Sheet</h1>
+
+      {loading && <div>Loading students...</div>}
+      {error && <div style={{ color: "red" }}>{error}</div>}
 
       {/* Search Bar */}
       <input
@@ -204,10 +264,10 @@ const AttendanceSheet = () => {
               </td>
               <td style={styles.cell}>
                 <button
-                  style={styles.button}
-                  onClick={() => openModal(student, "view")}
+                  style={{ ...styles.button, backgroundColor: '#dc3545' }}
+                  onClick={() => deleteStudent(student.enrollmentNumber)}
                 >
-                  View
+                  Delete
                 </button>
                 <button
                   style={styles.captureButton}
@@ -432,6 +492,15 @@ const styles = {
     fontSize: "18px",
     fontWeight: "bold",
     marginBottom: "10px",
+  },
+  deleteButton: {
+    padding: '5px 10px',
+    margin: '0 5px',
+    backgroundColor: '#dc3545',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
   },
 };
 

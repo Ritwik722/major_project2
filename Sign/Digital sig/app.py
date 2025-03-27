@@ -79,7 +79,7 @@ def verify_signature_route():
         signature_path = f"signatures/{student_id}_signature.png"
         if not os.path.exists(signature_path):
             return jsonify({'valid': False, 'error': 'No signature on file for this student'})
-        
+           
         # Load the stored digital signature
         signature_file_path = f"signatures/{student_id}_digital_signature.bin"
         if not os.path.exists(signature_file_path):

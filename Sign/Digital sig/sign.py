@@ -75,3 +75,4 @@ if __name__ == "__main__":
         with open("signature.bin", "wb") as sig_file:
             sig_file.write(signature)
         print("Signature saved to 'signature.bin'.")
+ 
