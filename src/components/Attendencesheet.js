@@ -100,7 +100,11 @@ const AttendanceSheet = () => {
   );
 
   const openModal = (student, type) => {
-    setSelectedStudent({ ...student }); // Create a copy to avoid direct mutation
+    if (type === "capture") {
+      window.location.href = "http://127.0.0.1:5500/";
+      return;
+    }
+    setSelectedStudent({ ...student });
     setModalType(type);
   };
 
@@ -248,7 +252,14 @@ const AttendanceSheet = () => {
                     style={styles.image}
                   />
                 ) : (
-                  <span style={styles.placeholder}>Not Captured</span>
+                  <div>
+                    <button
+                      style={styles.captureButtonSmall}
+                      onClick={() => openModal(student, "capture")}
+                    >
+                      Capture Photo
+                    </button>
+                  </div>
                 )}
               </td>
               <td style={styles.cell}>
@@ -259,7 +270,14 @@ const AttendanceSheet = () => {
                     style={styles.image}
                   />
                 ) : (
-                  <span style={styles.placeholder}>Not Captured</span>
+                  <div>
+                    <button
+                      style={styles.captureButtonSmall}
+                      onClick={() => openModal(student, "capture")}
+                    >
+                      Capture Sign
+                    </button>
+                  </div>
                 )}
               </td>
               <td style={styles.cell}>
@@ -268,12 +286,6 @@ const AttendanceSheet = () => {
                   onClick={() => deleteStudent(student.enrollmentNumber)}
                 >
                   Delete
-                </button>
-                <button
-                  style={styles.captureButton}
-                  onClick={() => openModal(student, "capture")}
-                >
-                  Capture
                 </button>
                 <button
                   style={styles.editButton}
@@ -501,6 +513,18 @@ const styles = {
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
+  },
+  captureButtonSmall: {
+    padding: '3px 8px',
+    margin: '5px',
+    backgroundColor: '#28A745',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    display: 'block',
+    width: '100%',
   },
 };
 

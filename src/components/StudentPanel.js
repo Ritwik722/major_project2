@@ -78,16 +78,45 @@ function StudentRegistration() {
         return new File([blob], 'image.png', { type: mimeString });
     };
 
-    const handleTakePhoto = (type, dataUri) => {
+    const handleTakePhoto = async (type, dataUri) => {
         const file = dataUriToFile(dataUri);
+        
+        if (type === 'studentPhoto') {
+            try {
+                const formDataToSend = new FormData();
+                formDataToSend.append('photo', file);
+                formDataToSend.append('enrollmentNumber', formData.enrollmentNumber);
+    
+                const response = await fetch('http://localhost:5000/api/upload-photo', {
+                    method: 'POST',
+                    body: formDataToSend,
+                });
+    
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Failed to save photo');
+                    }
+                    console.log('Photo saved successfully:', result);
+                    alert('Photo saved successfully!');
+                } else {
+                    throw new Error('Server response was not JSON');
+                }
+            } catch (error) {
+                console.error('Error saving photo:', error);
+                alert(`Failed to save photo: ${error.message}`);
+            }
+        }
+
         setFormData(prevState => ({
             ...prevState,
-            [type]: file
+            [type]: {
+                file: file,
+                preview: dataUri
+            }
         }));
-        localStorage.setItem('formData', JSON.stringify({
-            ...formData,
-            [type]: file
-        }));
+        
         setIsCameraActive(prev => ({
             ...prev,
             [type]: false
@@ -181,51 +210,66 @@ function StudentRegistration() {
         }
     };
 
-const renderCameraSection = (type) => (
-    <div className="camera-section">
-        {isCameraActive[type] ? (
+    const renderCameraSection = (type) => (
+        <div className="camera-section">
+          {isCameraActive[type] ? (
             <Camera
-                onTakePhoto={(dataUri) => handleTakePhoto(type, dataUri)}
-                idealFacingMode="environment"
-                imageType="png"
-                imageCompression={0.97}
-                isImageMirror={false}
+              onTakePhoto={(dataUri) => handleTakePhoto(type, dataUri)}
+              idealFacingMode="environment"
+              imageType="png"
+              imageCompression={0.97}
+              isImageMirror={false}
             />
-        ) : (
+          ) : (
             <div>
+              {type === 'digitalSignature' ? (
+                <button
+  type="button"
+  onClick={() => window.open('http://127.0.0.1:5500/', '_blank')}
+>
+  Capture Digital Signature
+</button>
+              ) : (
                 <button 
-                    type="button" 
-                    onClick={() => setIsCameraActive(prev => ({ ...prev, [type]: true }))}
+                  type="button" 
+                  onClick={() => setIsCameraActive(prev => ({ ...prev, [type]: true }))}
                 >
-                    {type === 'studentPhoto' ? 'Capture Student Photo' : 'Capture Digital Signature'}
+                  Capture Student Photo
                 </button>
-                <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={(e) => handleFileUpload(type, e)} 
+              )}
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={(e) => handleFileUpload(type, e)} 
+              />
+              {formData[type] instanceof File && (
+                <img 
+                  src={URL.createObjectURL(formData[type])} 
+                  alt={type} 
+                  style={{ width: '100px', height: '100px', objectFit: 'cover' }} 
                 />
-                {formData[type] instanceof File && (
-                    <img 
-                        src={URL.createObjectURL(formData[type])} 
-                        alt={type} 
-                        style={{ width: '100px', height: '100px', objectFit: 'cover' }} 
-                    />
-                )}
+              )}
             </div>
-        )}
-    </div>
-);
+          )}
+        </div>
+      );
+      
 
 const handleFileUpload = (type, e) => {
     const file = e.target.files[0];
-    setFormData(prevState => ({
-        ...prevState,
-        [type]: file
-    }));
-    localStorage.setItem('formData', JSON.stringify({
-        ...formData,
-        [type]: file
-    }));
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        setFormData(prevState => ({
+            ...prevState,
+            [type]: {
+                file: file,
+                preview: reader.result
+            }
+        }));
+    };
+    if (file) {
+        reader.readAsDataURL(file);
+    }
 };
 
      
@@ -292,6 +336,7 @@ const handleFileUpload = (type, e) => {
                 required
             >
                 <option value="">Select Department</option>
+                <option value="IT">Informaton Technology</option>
                 <option value="CSE">Computer Science</option>
                 <option value="ECE">Electronics & Communication</option>
                 <option value="MECH">Mechanical Engineering</option>
@@ -392,11 +437,11 @@ const handleFileUpload = (type, e) => {
                     </div>
                 </div>
                 <div className="grid-item">
-                    {formData.studentPhoto && (
+                    {formData.studentPhoto?.preview && (
                         <div>
                             <h4>Student Photo</h4>
                             <img 
-                                src={URL.createObjectURL(formData.studentPhoto)} 
+                                src={formData.studentPhoto.preview}
                                 alt="Student" 
                                 style={{ width: '200px', height: '200px', objectFit: 'cover' }} 
                             />
@@ -404,11 +449,11 @@ const handleFileUpload = (type, e) => {
                     )}
                 </div>
                 <div className="grid-item">
-                    {formData.digitalSignature && (
+                    {formData.digitalSignature?.preview && (
                         <div>
                             <h4>Digital Signature</h4>
                             <img 
-                                src={URL.createObjectURL(formData.digitalSignature)} 
+                                src={formData.digitalSignature.preview}
                                 alt="Signature" 
                                 style={{ width: '200px', height: '100px', objectFit: 'contain' }} 
                             />
