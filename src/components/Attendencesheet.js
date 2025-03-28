@@ -52,6 +52,7 @@ const AttendanceSheet = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null); // New state for selected room
+  const [token, setToken] = useState("YOUR_JWT_TOKEN_HERE"); // State for storing the JWT token
 
   // Fetch function for getting rooms from the API
   const fetchRooms = async () => {
@@ -60,6 +61,7 @@ const AttendanceSheet = () => {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
       });
 
@@ -89,6 +91,7 @@ const AttendanceSheet = () => {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
       });
 
@@ -167,6 +170,7 @@ const AttendanceSheet = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(selectedStudent),
       });
@@ -233,6 +237,9 @@ const AttendanceSheet = () => {
       try {
         const response = await fetch(`http://localhost:5000/api/students/${enrollmentNumber}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
         });
 
         if (!response.ok) {
