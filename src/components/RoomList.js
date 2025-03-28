@@ -4,7 +4,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
   const [rooms, setRooms] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [editRoom, setEditRoom] = useState(null);
-  const [form, setForm] = useState({ number: "", range: "" });
+  const [form, setForm] = useState({ number: "", range: "", capacity: "" });
   const [showModal, setShowModal] = useState(false);
 
   // Load rooms from the API on component mount
@@ -37,7 +37,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
   };
 
   const handleAddRoom = async () => {
-    if (form.number && form.range) {
+    if (form.number && form.range && form.capacity) {
       const capacity = calculateCapacity(form.range);
       if (capacity > 50) {
         alert("Room capacity cannot exceed 50 students.");
@@ -54,7 +54,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
         });
         const newRoom = await response.json();
         setRooms((prevRooms) => [...prevRooms, newRoom]);
-        setForm({ number: "", range: "" });
+        setForm({ number: "", range: "", capacity: "" });
       } catch (error) {
         console.error("Error adding room:", error);
       }
@@ -63,7 +63,7 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
 
   const handleEditRoom = (room) => {
     setEditRoom(room);
-    setForm({ number: room.number, range: room.range });
+    setForm({ number: room.number, range: room.range, capacity: room.capacity });
     setShowModal(true);
   };
 
@@ -88,12 +88,11 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
       );
       setEditRoom(null);
       setShowModal(false);
-      setForm({ number: "", range: "" });
+      setForm({ number: "", range: "", capacity: "" });
     } catch (error) {
       console.error("Error updating room:", error);
     }
   };
-  
 
   const handleDeleteRoom = async (roomId) => {
     if (window.confirm("Are you sure you want to delete this room?")) {
@@ -149,6 +148,14 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
           name="range"
           placeholder="Enrollment Number Range (e.g., 1001-1100)"
           value={form.range}
+          onChange={handleInputChange}
+          style={styles.input}
+        />
+        <input
+          type="text"
+          name="capacity"
+          placeholder="Room Capacity"
+          value={form.capacity}
           onChange={handleInputChange}
           style={styles.input}
         />
@@ -217,6 +224,14 @@ const RoomList = ({ onOpenAttendanceSheet }) => {
               name="range"
               placeholder="Enrollment Number Range"
               value={form.range}
+              onChange={handleInputChange}
+              style={styles.input}
+            />
+            <input
+              type="text"
+              name="capacity"
+              placeholder="Room Capacity"
+              value={form.capacity}
               onChange={handleInputChange}
               style={styles.input}
             />
