@@ -44,15 +44,46 @@ const uploadSignature = async (file) => {
 
 const AttendanceSheet = () => {
   const [students, setStudents] = useState([]);
+  const [rooms, setRooms] = useState([]); // New state for rooms
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [modalType, setModalType] = useState(""); // 'view', 'capture', 'edit'
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState(null); // New state for selected room
 
-  // Add fetch function for getting students from MongoDB
-  const fetchStudents = async () => {
+  // Fetch function for getting rooms from the API
+  const fetchRooms = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/rooms", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch rooms");
+      }
+      const result = await response.json();
+
+      // Ensure the data is an array
+      if (Array.isArray(result)) {
+        setRooms(result); // Set the rooms state to the array
+      } else {
+        throw new Error("Invalid response format");
+      }
+
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // Fetch function for getting students from the API
+  const fetchStudents = async (range) => {
     try {
       const response = await fetch("http://localhost:5000/api/students", {
         method: "GET",
@@ -68,11 +99,15 @@ const AttendanceSheet = () => {
 
       // Ensure the data is an array
       if (result.success && Array.isArray(result.data)) {
-        setStudents(result.data); // Set the students state to the array
+        const filteredStudents = result.data.filter(student => {
+          const enrollmentNumber = parseInt(student.enrollmentNumber, 10);
+          return enrollmentNumber >= range[0] && enrollmentNumber <= range[1];
+        });
+        setStudents(filteredStudents); // Set the students state to the array
       } else {
         throw new Error("Invalid response format");
       }
-  
+
       setLoading(false);
     } catch (err) {
       setError(err.message);
@@ -80,9 +115,9 @@ const AttendanceSheet = () => {
     }
   };
 
-  // Use useEffect to fetch students when component mounts
+  // Use useEffect to fetch rooms when component mounts
   useEffect(() => {
-    fetchStudents();
+    fetchRooms();
   }, []);
 
   useEffect(() => {
@@ -91,6 +126,12 @@ const AttendanceSheet = () => {
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value.toLowerCase());
+  };
+
+  const handleRoomClick = (room) => {
+    setSelectedRoom(room);
+    const range = room.range.split('-').map(Number);
+    fetchStudents(range);
   };
 
   const filteredStudents = students.filter(
@@ -129,13 +170,13 @@ const AttendanceSheet = () => {
         },
         body: JSON.stringify(selectedStudent),
       });
-  
+
       if (!response.ok) {
         throw new Error('Failed to update student');
       }
-  
+
       const result = await response.json();
-      
+
       // Update the local state
       setStudents(prevStudents =>
         prevStudents.map(student =>
@@ -144,12 +185,12 @@ const AttendanceSheet = () => {
             : student
         )
       );
-  
+
       setSuccessMessage('Student updated successfully');
       setTimeout(() => {
         closeModal();
       }, 1500);
-  
+
     } catch (error) {
       setError(error.message);
     }
@@ -193,11 +234,11 @@ const AttendanceSheet = () => {
         const response = await fetch(`http://localhost:5000/api/students/${enrollmentNumber}`, {
           method: 'DELETE',
         });
-  
+
         if (!response.ok) {
           throw new Error('Failed to delete student');
         }
-  
+
         setStudents(prevStudents => 
           prevStudents.filter(student => student.enrollmentNumber !== enrollmentNumber)
         );
@@ -212,8 +253,22 @@ const AttendanceSheet = () => {
     <div style={styles.container}>
       <h1 style={styles.title}>Attendance Sheet</h1>
 
-      {loading && <div>Loading students...</div>}
+      {loading && <div>Loading...</div>}
       {error && <div style={{ color: "red" }}>{error}</div>}
+
+      {/* Room List */}
+      <div style={styles.roomList}>
+        <h2 style={styles.subtitle}>Rooms</h2>
+        {rooms.map((room) => (
+          <button
+            key={room.number}
+            style={styles.roomButton}
+            onClick={() => handleRoomClick(room)}
+          >
+            Room {room.number}
+          </button>
+        ))}
+      </div>
 
       {/* Search Bar */}
       <input
@@ -404,6 +459,12 @@ const styles = {
     fontWeight: "bold",
     marginBottom: "20px",
   },
+  subtitle: {
+    textAlign: "center",
+    fontSize: "20px",
+    fontWeight: "bold",
+    marginBottom: "10px",
+  },
   input: {
     padding: "8px",
     marginBottom: "20px",
@@ -526,6 +587,19 @@ const styles = {
     display: 'block',
     width: '100%',
   },
+  roomList: {
+    marginBottom: "20px",
+    textAlign: "center",
+  },
+  roomButton: {
+    padding: "10px 20px",
+    margin: "5px",
+    backgroundColor: "#007BFF",
+    color: "#fff",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+  }
 };
 
 export default AttendanceSheet;
