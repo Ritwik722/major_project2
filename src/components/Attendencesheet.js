@@ -56,33 +56,34 @@ const AttendanceSheet = () => {
 
   // Fetch function for getting rooms from the API
   const fetchRooms = async () => {
-    try {
-      const response = await fetch("http://localhost:5000/api/rooms", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-           Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+  try {
+    const response = await fetch("http://localhost:5000/api/rooms", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch rooms");
-      }
-      const result = await response.json();
-
-      // Ensure the data is an array
-      if (Array.isArray(result)) {
-        setRooms(result); // Set the rooms state to the array
-      } else {
-        throw new Error("Invalid response format");
-      }
-
-      setLoading(false);
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error("Failed to fetch rooms");
     }
-  };
+
+    const result = await response.json();
+
+    // Ensure the data is an array
+    if (Array.isArray(result)) {
+      setRooms(result); // Set the rooms state to the array
+    } else {
+      throw new Error("Invalid response format");
+    }
+
+    setLoading(false);
+  } catch (err) {
+    setError(err?.message || "An unexpected error occurred");
+    setLoading(false);
+  }
+};
 
   // Fetch function for getting students from the API
   const fetchStudents = async (range) => {
