@@ -3,17 +3,22 @@ from deepface import DeepFace  # Install via: pip install deepface
 import os
 
 # MongoDB Connection Setup
-client = MongoClient("mongodb+srv://ritwiksuneliya:Ritwik123@cluster0.4o02p.mongodb.net/attendance-system?retryWrites=true&w=majority")
-db = client["attendance-system"]  # Database name
+client = MongoClient("mongodb://localhost:27017/")
+db = client["face_db"]  # Database name
 embeddings_collection = db["face_embeddings"]  # Collection to store embeddings
 
 # Folder Path to Images
-folder_path = r"C:\Users\RITHWIK\Desktop\Major_Project\face recog\db_images"  # Replace with your folder path
+folder_path = r"E:\MAJOR TEST\face recog\db_images"  # Replace with your folder path
 
 # Extract and Save Embeddings
 for filename in os.listdir(folder_path):
     if filename.endswith((".png", ".jpg", ".jpeg")):  # Process only images
         file_path = os.path.join(folder_path, filename)
+        
+        # Check if the image is already in MongoDB
+        if embeddings_collection.find_one({"filename": filename}):
+            print(f"Image '{filename}' already exists in MongoDB. Skipping...")
+            continue
         
         try:
             # Generate Embedding Using DeepFace

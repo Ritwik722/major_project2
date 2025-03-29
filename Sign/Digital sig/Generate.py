@@ -1,11 +1,15 @@
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from pymongo import MongoClient
+import os
 
 # MongoDB Connection
 client = MongoClient("mongodb+srv://ritwiksuneliya:Ritwik123@cluster0.4o02p.mongodb.net/attendance-system?retryWrites=true&w=majority")  # Connect to MongoDB server
 db = client["attendance-system"]  # Use your database name
 students_collection = db["Signature"]  # Use your collection name
+
+# Update keys directory path
+KEYS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "keys")
 
 def generate_and_store_keys(student_id):
     """
@@ -15,6 +19,9 @@ def generate_and_store_keys(student_id):
     Args:
         student_id (str): Unique identifier for the student.
     """
+    # Create keys directory if it doesn't exist
+    os.makedirs(KEYS_DIR, exist_ok=True)
+    
     # Check if the student's keys already exist in MongoDB
     if students_collection.find_one({"student_id": student_id}):
         print(f"Keys for student '{student_id}' already exist in MongoDB.")
@@ -44,11 +51,13 @@ def generate_and_store_keys(student_id):
         )
 
         # Save Private Key to a File
-        with open(f"{student_id}_private_key.pem", "wb") as private_file:
+        private_key_path = os.path.join(KEYS_DIR, f"{student_id}_private_key.pem")
+        with open(private_key_path, "wb") as private_file:
             private_file.write(private_key_pem)
 
         # Save Public Key to a File
-        with open(f"{student_id}_public_key.pem", "wb") as public_file:
+        public_key_path = os.path.join(KEYS_DIR, f"{student_id}_public_key.pem")
+        with open(public_key_path, "wb") as public_file:
             public_file.write(public_key_pem)
 
         print(f"Keys have been successfully saved to files for {student_id}.")

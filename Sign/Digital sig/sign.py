@@ -6,7 +6,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 import os
 
-KEYS_DIR = "keys"
+# Update keys directory path
+KEYS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "keys")
 
 def generate_keys(student_id):
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -40,7 +41,8 @@ def sign_message(student_id, message):
     """
     try:
         # Load private key from file
-        with open(f"{student_id}_private_key.pem", "rb") as private_file:
+        private_key_path = os.path.join(KEYS_DIR, f"{student_id}_private_key.pem")
+        with open(private_key_path, "rb") as private_file:
             private_key = serialization.load_pem_private_key(
                 private_file.read(),
                 password=None
@@ -75,4 +77,3 @@ if __name__ == "__main__":
         with open("signature.bin", "wb") as sig_file:
             sig_file.write(signature)
         print("Signature saved to 'signature.bin'.")
- 
