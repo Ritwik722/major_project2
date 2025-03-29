@@ -9,6 +9,10 @@ router.post('/register', studentController.registerStudent);
 router.post('/login', studentController.loginStudent);
 router.put('/update', auth, studentController.updateStudent);
 
+router.post('/signature/generate-keys', auth, studentController.generateSignatureKeys);
+router.post('/signature/sign', auth, studentController.signDocument);
+router.post('/signature/verify', studentController.verifySignature);
+
 // Fetch all students
 router.get('/', authController.getAllStudents);
 router.delete('/:enrollmentNumber', authController.deleteStudent);
