@@ -3,42 +3,68 @@ import React, { useState, useEffect } from "react";
 const performFaceRecognition = async (file) => {
   const formData = new FormData();
   formData.append("image", file);
+  formData.append("studentId", selectedStudent.enrollmentNumber);
 
   try {
-    const response = await fetch("http://localhost:5000/api/face-recognition", {
+    const response = await fetch("http://localhost:5000/api/verify-face", {
       method: "POST",
       body: formData,
     });
-
+    
     const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || "Face recognition failed");
-    }
-
-    return result;
+    if (!response.ok) throw new Error(result.error);
+    
+    // Add cryptographic verification
+    const sigResponse = await fetch("http://localhost:5000/api/verify-signature", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentId: selectedStudent.enrollmentNumber,
+        signatureData: result.signature
+      })
+    });
+    
+    const sigResult = await sigResponse.json();
+    return { 
+      ...result,
+      signatureValid: sigResult.valid,
+      similarity: sigResult.similarity
+    };
+    
   } catch (error) {
-    throw new Error(error.message || "Unexpected error occurred");
+    throw new Error(error.message);
   }
 };
 
-const uploadSignature = async (file) => {
-  const formData = new FormData();
-  formData.append("signature", file);
+const handleCaptureSignature = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
   try {
+    const formData = new FormData();
+    formData.append("signature", file);
+    formData.append("studentId", selectedStudent.enrollmentNumber);
+
     const response = await fetch("http://localhost:5000/api/upload-signature", {
       method: "POST",
-      body: formData,
+      body: formData
     });
 
     const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || "Signature upload failed");
-    }
+    if (!response.ok) throw new Error(result.error);
 
-    return result;
+    // Update local state with verification results
+    setSelectedStudent(prev => ({
+      ...prev,
+      signature: URL.createObjectURL(file),
+      signatureValid: result.valid,
+      similarityScore: result.similarity
+    }));
+    
+    setSuccessMessage(`Signature uploaded (${Math.round(result.similarity*100)}% match)`);
+    
   } catch (error) {
-    throw new Error(error.message || "Unexpected error occurred");
+    setError(error.message);
   }
 };
 

@@ -8,6 +8,7 @@ from deepface import DeepFace
 import pymongo
 import tempfile  # To handle temporary file storage
 import time  # To add delays if necessary
+import subprocess  # To run external scripts
 
 # MongoDB Setup
 mongo_uri = "mongodb://localhost:27017/"
@@ -74,7 +75,7 @@ def capture_image(auto_capture_delay=15, save_to_db_images=True, allow_recogniti
 
         # Capture a single frame
         ret, frame = cap.read()
-        if not ret:
+        if not ret or frame is None:
             print("Failed to capture image from camera.")
             cap.release()
             cv2.destroyAllWindows()
@@ -83,25 +84,12 @@ def capture_image(auto_capture_delay=15, save_to_db_images=True, allow_recogniti
         # Save the captured frame temporarily to generate its embedding
         temp_dir = tempfile.gettempdir()
         temp_image_path = os.path.join(temp_dir, "temp_captured_image.png")
-        cv2.imwrite(temp_image_path, frame)
-
-        # Generate embedding for the captured image
-        new_embedding = get_face_embedding(temp_image_path)
-        if new_embedding is None:
-            print("No face detected in the captured image. Skipping save.")
+        if not cv2.imwrite(temp_image_path, frame):
+            print(f"Failed to save temporary image to {temp_image_path}.")
             cap.release()
             return None
 
-        # Check for duplicate faces in MongoDB
-        if is_duplicate_face(new_embedding, threshold=0.70):
-            print("Duplicate face detected. Image will not be saved.")
-            cap.release()
-
-            if allow_recognition_on_duplicate:
-                print("Reopening camera for recognition...")
-                return temp_image_path  # Return the temporary image path for recognition
-            else:
-                return None
+        print(f"Temporary image saved to {temp_image_path}.")
 
         # Determine the save path
         if save_to_db_images:
@@ -116,10 +104,41 @@ def capture_image(auto_capture_delay=15, save_to_db_images=True, allow_recogniti
             image_path = os.path.join(db_images_folder, f"capture_image{count}.png")
 
             # Save the captured image
-            cv2.imwrite(image_path, frame)
+            if not cv2.imwrite(image_path, frame):
+                print(f"Failed to save image to {image_path}.")
+                cap.release()
+                return None
+
             print(f"Image captured and saved to {image_path}\n")
         else:
             image_path = temp_image_path
+
+        # Generate embedding for the captured image
+        new_embedding = get_face_embedding(image_path)  # Use the saved image path
+        if new_embedding is None:
+            print("No face detected in the captured image. Skipping save.")
+            cap.release()
+            return None
+
+        # Check for duplicate faces in MongoDB
+        if is_duplicate_face(new_embedding, threshold=0.70):
+            print("Duplicate face detected. Image will not be saved.")
+            cap.release()
+
+            if allow_recognition_on_duplicate:
+                print("Reopening camera for recognition...")
+                return image_path  # Return the saved image path for recognition
+            else:
+                return None
+
+        # Trigger db2.py to process the new image
+        if save_to_db_images:
+            try:
+                print("Triggering db2.py to process the new image...")
+                subprocess.run(["python", r"E:\MAJOR TEST\face recog\db2.py"], check=True)
+                print("db2.py executed successfully.\n")
+            except subprocess.CalledProcessError as e:
+                print(f"Error while running db2.py: {e}\n")
 
         # Release the camera
         cap.release()
@@ -186,16 +205,22 @@ def recognize_face_in_database(check_embedding, threshold=0.70):
         print("No matching face found in the database within the threshold.\n")
         return None, None
 
-if __name__ == "__main__":
-    # Step 1: Capture image and save to db_images folder
-    captured_image_path = capture_image(auto_capture_delay=2, save_to_db_images=True, allow_recognition_on_duplicate=True)
+def recognize_face_from_camera(auto_capture_delay=2):
+    """
+    Reopen the camera to capture an image for recognition and match it with stored embeddings.
+    
+    Parameters:
+    - auto_capture_delay (int): Time in seconds to wait before capturing the image.
+    """
+    print("Reopening camera for recognition...")
+    captured_image_path = capture_image(auto_capture_delay=auto_capture_delay, save_to_db_images=False)
 
     if captured_image_path is not None:
-        print("Captured image saved successfully or prepared for recognition.\n")
+        print("Captured image prepared for recognition.\n")
 
         # Generate embedding for the captured image
         recognition_embedding = get_face_embedding(captured_image_path)
-        
+
         if recognition_embedding is not None:
             # Compare with stored embeddings in MongoDB
             match_doc, similarity = recognize_face_in_database(recognition_embedding, threshold)
@@ -204,7 +229,7 @@ if __name__ == "__main__":
                 print(f"Similarity Score (Cosine Similarity): {similarity:.3f}")
             else:
                 print("No matching face found in the database.")
-            
+
             # Optionally, delete the temporary recognition image
             try:
                 os.remove(captured_image_path)
@@ -215,3 +240,36 @@ if __name__ == "__main__":
             print("No face found in the recognition image.")
     else:
         print("Image capture failed. Please ensure the camera is connected and try again.")
+
+if __name__ == "__main__":
+    # Step 1: Capture image and save to db_images folder
+    captured_image_path = capture_image(auto_capture_delay=2, save_to_db_images=True, allow_recognition_on_duplicate=True)
+
+    if captured_image_path is not None:
+        print("Captured image saved successfully or prepared for recognition.\n")
+
+        # Generate embedding for the captured image
+        recognition_embedding = get_face_embedding(captured_image_path)
+
+        if recognition_embedding is not None:
+            # Compare with stored embeddings in MongoDB
+            match_doc, similarity = recognize_face_in_database(recognition_embedding, threshold)
+            if match_doc is not None:
+                print(f"Face matches with filename: '{match_doc['filename']}'")
+                print(f"Similarity Score (Cosine Similarity): {similarity:.3f}")
+            else:
+                print("No matching face found in the database.")
+
+            # Optionally, delete the temporary recognition image
+            try:
+                os.remove(captured_image_path)
+                print(f"\nTemporary image '{captured_image_path}' has been deleted.")
+            except Exception as e:
+                print(f"Could not delete temporary image: {e}")
+        else:
+            print("No face found in the recognition image.")
+    else:
+        print("Image capture failed. Please ensure the camera is connected and try again.")
+
+    # Step 2: Reopen camera for recognition
+    recognize_face_from_camera(auto_capture_delay=2)

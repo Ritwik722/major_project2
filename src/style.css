@@ -230,3 +230,24 @@ button:hover {
   margin-left: 4px;
   font-weight: bold;
 }
+
+.signature-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.signature-controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.key-preview {
+  display: inline-block;
+  background: #f0f0f0;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+}

@@ -8,7 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const roomRoutes = require('./routes/roomRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const teacherRoutes = require('./routes/teacherRoutes');
-
+const signatureRoutes = require('./routes/signatureRoutes');
 const app = express();
 
 const mongoose = require('mongoose');
@@ -37,7 +37,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/teachers', teacherRoutes);
-
+app.use('/api/signature', signatureRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

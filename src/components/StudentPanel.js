@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Camera from 'react-html5-camera-photo';
+import SignaturePad from 'signature_pad';
 import 'react-html5-camera-photo/build/css/index.css';
 
 function StudentRegistration() {
@@ -18,16 +19,31 @@ function StudentRegistration() {
         password: '',
         confirmPassword: '',
         studentPhoto: null,
-        digitalSignature: null
+        digitalSignature: null,
+        publicKey: null
     });
 
     const [yearOptions, setYearOptions] = useState([]);
-
     const [isCameraActive, setIsCameraActive] = useState({
         studentPhoto: false,
         digitalSignature: false
     });
 
+    // Add signature pad instance state
+    const [signaturePadInstance, setSignaturePadInstance] = useState(null);
+    const canvasRef = useRef(null);
+
+    useEffect(() => {
+        if (canvasRef.current && !signaturePadInstance) {
+            const pad = new SignaturePad(canvasRef.current, {
+                backgroundColor: 'rgba(255, 255, 255, 0)',
+                penColor: 'rgb(0, 0, 0)'
+            });
+            setSignaturePadInstance(pad);
+        }
+    }, [canvasRef, signaturePadInstance]);
+
+    // Load saved form data from localStorage
     useEffect(() => {
         const storedFormData = localStorage.getItem('formData');
         if (storedFormData) {
@@ -35,9 +51,11 @@ function StudentRegistration() {
         }
     }, []);
 
+    // Handle input changes for form fields
     const handleInputChange = (e) => {
         const { name, value } = e.target;
 
+        // Update year options based on selected course
         if (name === 'course') {
             switch (value) {
                 case 'btech':
@@ -54,75 +72,142 @@ function StudentRegistration() {
             }
         }
 
-        setFormData(prevState => ({
-            ...prevState,
-            [name]: value
-        }));
-        localStorage.setItem('formData', JSON.stringify({
+        // Update form data and save to localStorage
+        const updatedFormData = {
             ...formData,
             [name]: value
-        }));
+        };
+        
+        setFormData(updatedFormData);
+        localStorage.setItem('formData', JSON.stringify(updatedFormData));
     };
 
+    // Enhanced data URI to File conversion with error handling
     const dataUriToFile = (dataUri) => {
-        const byteString = atob(dataUri.split(',')[1]);
-        const mimeString = dataUri.split(',')[0].split(':')[1].split(';')[0];
-        const arrayBuffer = new ArrayBuffer(byteString.length);
-        const uintArray = new Uint8Array(arrayBuffer);
+        try {
+            const byteString = atob(dataUri.split(',')[1]);
+            const mimeString = dataUri.split(',')[0].split(':')[1].split(';')[0];
+            const arrayBuffer = new ArrayBuffer(byteString.length);
+            const uintArray = new Uint8Array(arrayBuffer);
 
-        for (let i = 0; i < byteString.length; i++) {
-            uintArray[i] = byteString.charCodeAt(i);
+            for (let i = 0; i < byteString.length; i++) {
+                uintArray[i] = byteString.charCodeAt(i);
+            }
+
+            return new File([uintArray], 'image.png', { type: mimeString });
+        } catch (error) {
+            console.error('Data URI conversion failed:', error);
+            throw new Error('Invalid image format');
         }
-
-        const blob = new Blob([uintArray], { type: mimeString });
-        return new File([blob], 'image.png', { type: mimeString });
     };
 
+    // Enhanced photo handler with cryptographic integration
     const handleTakePhoto = async (type, dataUri) => {
-        const file = dataUriToFile(dataUri);
-        
-        if (type === 'studentPhoto') {
-            try {
-                const formDataToSend = new FormData();
-                formDataToSend.append('photo', file);
-                formDataToSend.append('enrollmentNumber', formData.enrollmentNumber);
-    
-                const response = await fetch('http://localhost:5000/api/upload-photo', {
-                    method: 'POST',
-                    body: formDataToSend,
-                });
-    
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const result = await response.json();
-                    if (!response.ok) {
-                        throw new Error(result.message || 'Failed to save photo');
-                    }
-                    console.log('Photo saved successfully:', result);
-                    alert('Photo saved successfully!');
-                } else {
-                    throw new Error('Server response was not JSON');
-                }
-            } catch (error) {
-                console.error('Error saving photo:', error);
-                alert(`Failed to save photo: ${error.message}`);
-            }
-        }
+        try {
+            const file = dataUriToFile(dataUri);
+            const formDataToSend = new FormData();
+            formDataToSend.append('file', file);
+            formDataToSend.append('studentId', formData.enrollmentNumber);
 
-        setFormData(prevState => ({
-            ...prevState,
-            [type]: {
-                file: file,
-                preview: dataUri
+            // Unified API call handler
+            const processRequest = async (url, body) => {
+                const response = await fetch(url, body);
+                const contentType = response.headers.get("content-type");
+                
+                if (!response.ok) {
+                    const errorData = contentType?.includes('application/json') 
+                        ? await response.json()
+                        : { message: await response.text() };
+                    throw new Error(errorData.message || 'Request failed');
+                }
+                
+                return contentType?.includes('application/json') 
+                    ? response.json()
+                    : response.text();
+            };
+
+            if (type === 'studentPhoto') {
+                await processRequest('http://localhost:5000/api/upload-photo', {
+                    method: 'POST',
+                    body: formDataToSend
+                });
             }
-        }));
-        
-        setIsCameraActive(prev => ({
-            ...prev,
-            [type]: false
-        }));
+
+            // Generate keys on first photo upload
+            if (!formData.publicKey) {
+                try {
+                    const keys = await processRequest('http://localhost:5000/api/generate-keys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ studentId: formData.enrollmentNumber })
+                    });
+                    
+                    setFormData(prev => ({
+                        ...prev,
+                        publicKey: keys.publicKey
+                    }));
+                } catch (error) {
+                    console.error('Failed to generate keys:', error);
+                    // Continue without keys if the endpoint isn't available
+                }
+            }
+
+            // Update state after successful operations
+            setFormData(prev => ({
+                ...prev,
+                [type]: { file, preview: dataUri }
+            }));
+            
+        } catch (error) {
+            console.error(`${type} processing failed:`, error);
+            alert(`Error processing ${type}: ${error.message}`);
+        } finally {
+            setIsCameraActive(prev => ({ ...prev, [type]: false }));
+        }
     };
 
+    // Enhanced signature verification
+    const verifySignature = async (signatureData) => {
+        try {
+            const response = await fetch('http://localhost:5000/api/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    studentId: formData.enrollmentNumber,
+                    signatureData: signatureData.split(',')[1]
+                })
+            });
+
+            const result = await response.json();
+            if (!result.valid) {
+                throw new Error(`Signature mismatch: ${Math.round(result.similarity * 100)}% similarity`);
+            }
+            return true;
+        } catch (error) {
+            console.error('Verification failed:', error);
+            throw error;
+        }
+    };
+
+    // Handle file upload from disk
+    const handleFileUpload = (type, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFormData(prevState => ({
+                ...prevState,
+                [type]: {
+                    file: file,
+                    preview: reader.result
+                }
+            }));
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Validation for step 1
     const validateStep1 = () => {
         const requiredFields = [
             'enrollmentNumber', 'name', 'email', 'phoneNumber', 'gender', 
@@ -131,38 +216,47 @@ function StudentRegistration() {
         
         for (let field of requiredFields) {
             if (!formData[field]) {
-                alert(`Please fill in the ${field} field`);
+                alert(`Please fill in the ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} field`);
                 return false;
             }
         }
-          const phoneNumberPattern = /^\d{10}$/;
-    if (!phoneNumberPattern.test(formData.phoneNumber)) {
-        alert('Phone number must be exactly 10 digits.');
-        return false;
-    }
+
+        const phoneNumberPattern = /^\d{10}$/;
+        if (!phoneNumberPattern.test(formData.phoneNumber)) {
+            alert('Phone number must be exactly 10 digits.');
+            return false;
+        }
 
         const emailPattern = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-    if (!emailPattern.test(formData.email)) {
-        alert('Email must be a valid Gmail address.');
-        return false;
-    }
-
+        if (!emailPattern.test(formData.email)) {
+            alert('Email must be a valid Gmail address.');
+            return false;
+        }
 
         return true;
     };
 
+    // Validation for step 2
     const validateStep2 = () => {
+        if (!formData.password) {
+            alert('Please enter a password');
+            return false;
+        }
+        
         if (formData.password !== formData.confirmPassword) {
             alert('Passwords do not match');
             return false;
         }
+        
         if (formData.password.length < 6) {
             alert('Password must be at least 6 characters long');
             return false;
         }
+        
         return true;
     };
 
+    // Handle next step navigation
     const handleNextStep = () => {
         if (registrationStep === 1 && validateStep1()) {
             setRegistrationStep(2);
@@ -171,108 +265,167 @@ function StudentRegistration() {
         }
     };
 
+    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Verify signature before submission if available
+            if (formData.digitalSignature?.preview) {
+                try {
+                    await verifySignature(formData.digitalSignature.preview);
+                } catch (error) {
+                    // Continue even if verification fails or endpoint isn't available
+                    console.warn('Signature verification skipped:', error.message);
+                }
+            }
+
+            // Prepare registration payload
+            const registrationPayload = {
+                ...formData,
+                studentPhoto: formData.studentPhoto?.preview,
+                digitalSignature: formData.digitalSignature?.preview,
+                publicKey: formData.publicKey
+            };
+
+            // Submit registration
             const response = await fetch("http://localhost:5000/api/students/register", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(registrationPayload)
             });
+
             const result = await response.json();
-            if (response.ok) {
-                alert('Registration Submitted!');
-                localStorage.removeItem('formData');
-                setFormData({
-                    enrollmentNumber: '',
-                    name: '',
-                    email: '',
-                    phoneNumber: '',
-                    gender: '',
-                    department: '',
-                    course: '',
-                    year: '',
-                    section: '',
-                    password: '',
-                    confirmPassword: '',
-                    studentPhoto: null,
-                    digitalSignature: null
-                });
-                setMode('initial');
-            } else {
-                alert(result.message);
-            }
+            if (!response.ok) throw new Error(result.message || 'Registration failed');
+
+            // Reset state on success
+            alert('Registration Successful!');
+            localStorage.removeItem('formData');
+            setFormData({
+                enrollmentNumber: '',
+                name: '',
+                email: '',
+                phoneNumber: '',
+                gender: '',
+                department: '',
+                course: '',
+                year: '',
+                section: '',
+                password: '',
+                confirmPassword: '',
+                studentPhoto: null,
+                digitalSignature: null,
+                publicKey: null
+            });
+            setMode('initial');
+            setRegistrationStep(1);
+            
         } catch (error) {
-            console.error("Error submitting registration:", error);
-            alert('Error submitting registration');
+            console.error("Registration Error:", error);
+            alert(`Registration Failed: ${error.message}`);
         }
     };
 
-    const renderCameraSection = (type) => (
-        <div className="camera-section">
-          {isCameraActive[type] ? (
-            <Camera
-              onTakePhoto={(dataUri) => handleTakePhoto(type, dataUri)}
-              idealFacingMode="environment"
-              imageType="png"
-              imageCompression={0.97}
-              isImageMirror={false}
+    // Updated signature capture component
+    const renderSignaturePad = () => (
+        <div className="signature-section">
+            <canvas 
+                ref={canvasRef} 
+                width={500} 
+                height={200}
+                style={{
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    backgroundColor: '#f8f9fa'
+                }}
             />
-          ) : (
-            <div>
-              {type === 'digitalSignature' ? (
+            <div className="signature-controls">
                 <button
-  type="button"
-  onClick={() => window.open('http://127.0.0.1:5500/', '_blank')}
->
-  Capture Digital Signature
-</button>
-              ) : (
-                <button 
-                  type="button" 
-                  onClick={() => setIsCameraActive(prev => ({ ...prev, [type]: true }))}
+                    type="button"
+                    onClick={() => signaturePadInstance?.clear()}
+                    style={{ marginRight: '10px' }}
                 >
-                  Capture Student Photo
+                    Clear Signature
                 </button>
-              )}
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={(e) => handleFileUpload(type, e)} 
-              />
-              {formData[type] instanceof File && (
-                <img 
-                  src={URL.createObjectURL(formData[type])} 
-                  alt={type} 
-                  style={{ width: '100px', height: '100px', objectFit: 'cover' }} 
-                />
-              )}
+                <button
+                    type="button"
+                    onClick={async () => {
+                        if (signaturePadInstance && !signaturePadInstance.isEmpty()) {
+                            const dataUrl = signaturePadInstance.toDataURL();
+                            await handleTakePhoto('digitalSignature', dataUrl);
+                        } else {
+                            alert('Please draw your signature first');
+                        }
+                    }}
+                >
+                    Save Signature
+                </button>
             </div>
-          )}
         </div>
-      );
-      
+    );
 
-const handleFileUpload = (type, e) => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onloadend = () => {
-        setFormData(prevState => ({
-            ...prevState,
-            [type]: {
-                file: file,
-                preview: reader.result
-            }
-        }));
+    // Modified renderCameraSection for digital signatures
+    const renderCameraSection = (type) => {
+        if (type === 'digitalSignature') {
+            return renderSignaturePad();
+        }
+
+        return (
+            <div className="camera-section">
+                {isCameraActive[type] ? (
+                    <Camera
+                        onTakePhoto={(dataUri) => handleTakePhoto(type, dataUri)}
+                        idealFacingMode="environment"
+                        imageType="png"
+                        imageCompression={0.97}
+                        isImageMirror={false}
+                    />
+                ) : (
+                    <div>
+                        <button 
+                            type="button" 
+                            onClick={() => setIsCameraActive(prev => ({ ...prev, [type]: true }))}
+                            className="camera-button"
+                        >
+                            {type === 'studentPhoto' 
+                                ? 'Capture Student Photo'
+                                : 'Capture Signature'}
+                        </button>
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={(e) => handleFileUpload(type, e)} 
+                            style={{ display: 'none' }}
+                            id={`file-upload-${type}`}
+                        />
+                        <label 
+                            htmlFor={`file-upload-${type}`} 
+                            className="file-upload-label"
+                        >
+                            Upload {type === 'studentPhoto' ? 'Photo' : 'Signature'}
+                        </label>
+                        
+                        {/* Show preview if available */}
+                        {formData[type]?.preview && (
+                            <div className="preview-container">
+                                <img 
+                                    src={formData[type].preview} 
+                                    alt={type === 'studentPhoto' ? 'Student' : 'Signature'} 
+                                    style={{ 
+                                        width: type === 'studentPhoto' ? '100px' : '150px', 
+                                        height: type === 'studentPhoto' ? '100px' : '75px', 
+                                        objectFit: type === 'studentPhoto' ? 'cover' : 'contain',
+                                        margin: '10px 0' 
+                                    }} 
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
     };
-    if (file) {
-        reader.readAsDataURL(file);
-    }
-};
-
-     
+    
+    // Render the first step of registration
     const renderRegistrationStep1 = () => (
         <div className="registration-step-1">
             <h4>Enrollment Number <span style={{ color: 'red' }}>*</span></h4>
@@ -336,7 +489,7 @@ const handleFileUpload = (type, e) => {
                 required
             >
                 <option value="">Select Department</option>
-                <option value="IT">Informaton Technology</option>
+                <option value="IT">Information Technology</option>
                 <option value="CSE">Computer Science</option>
                 <option value="ECE">Electronics & Communication</option>
                 <option value="MECH">Mechanical Engineering</option>
@@ -364,8 +517,8 @@ const handleFileUpload = (type, e) => {
                 required
             >
                 <option value="">Select Academic Year</option>
-                {yearOptions.map((year, index) => (
-                    <option key={index} value={year}>{year}</option>
+                {yearOptions.map(year => (
+                    <option key={year} value={year}>{year}</option>
                 ))}
             </select>
     
@@ -383,11 +536,14 @@ const handleFileUpload = (type, e) => {
                 <option value="D">D</option>
             </select>
     
-            <button type="button" onClick={handleNextStep}>Next</button>
-            <button type="button" onClick={() => setMode('initial')}>Back</button>
+            <div className="action-buttons" style={{ marginTop: '20px' }}>
+                <button type="button" onClick={handleNextStep}>Next</button>
+                <button type="button" onClick={() => setMode('initial')}>Back</button>
+            </div>
         </div>
     );
     
+    // Render the second step of registration
     const renderRegistrationStep2 = () => (
         <div className="registration-step-2">
             <h4>Password <span style={{ color: 'red' }}>*</span></h4>
@@ -410,15 +566,20 @@ const handleFileUpload = (type, e) => {
                 required
             />
     
+            <h4>Student Photo <span style={{ color: 'red' }}>*</span></h4>
             {renderCameraSection('studentPhoto')}
+            
+            <h4>Digital Signature <span style={{ color: 'red' }}>*</span></h4>
             {renderCameraSection('digitalSignature')}
     
-            <button type="button" onClick={() => setRegistrationStep(1)}>Back</button>
-            <button type="button" onClick={handleNextStep}>Next</button>
+            <div className="action-buttons" style={{ marginTop: '20px' }}>
+                <button type="button" onClick={() => setRegistrationStep(1)}>Back</button>
+                <button type="button" onClick={handleNextStep}>Next</button>
+            </div>
         </div>
     );
     
-
+    // Render the final step of registration (preview)
     const renderRegistrationStep3 = () => (
         <div className="registration-preview">
             <h3>Registration Preview</h3>
@@ -460,8 +621,20 @@ const handleFileUpload = (type, e) => {
                         </div>
                     )}
                 </div>
+                {formData.publicKey && (
+                    <div className="grid-item">
+                        <div className="crypto-info">
+                            <h4>Cryptographic Verification</h4>
+                            <p><strong>Public Key:</strong> 
+                                <span className="key-preview">
+                                    {formData.publicKey.slice(0, 30)}...
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
-            <div className="action-buttons">
+            <div className="action-buttons" style={{ marginTop: '20px' }}>
                 <button type="button" onClick={() => setRegistrationStep(2)}>Back</button>
                 <button type="submit">Submit Registration</button>
             </div>

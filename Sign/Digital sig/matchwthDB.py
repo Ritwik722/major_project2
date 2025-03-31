@@ -1,18 +1,13 @@
 from cryptography.hazmat.primitives import serialization
 from pymongo import MongoClient
-import os
 
 # MongoDB Connection
 client = MongoClient("mongodb+srv://ritwiksuneliya:Ritwik123@cluster0.4o02p.mongodb.net/attendance-system?retryWrites=true&w=majority")  # Connect to MongoDB server
 db = client["attendance-system"]  # Use your database name
 students_collection = db["Signature"]  # Use your collection name
 
-# Update keys directory path
-KEYS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "keys")
-private_key_path = os.path.join(KEYS_DIR, "Student1_private_key.pem")
-
 # Load private key from file
-with open(private_key_path, "rb") as private_file:
+with open("Student1_private_key.pem", "rb") as private_file:
     private_key = serialization.load_pem_private_key(private_file.read(), password=None)
 
 # Load public key from MongoDB

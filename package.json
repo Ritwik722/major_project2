@@ -18,7 +18,8 @@
     "react-html5-camera-photo": "^1.5.11",
     "react-router-dom": "^7.1.1",
     "react-signature-canvas": "^1.1.0-alpha.1",
-    "react-webcam": "^7.2.0"
+    "react-webcam": "^7.2.0",
+    "signature_pad": "^5.0.7"
   },
   "scripts": {
     "start": "react-scripts start",

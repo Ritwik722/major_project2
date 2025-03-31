@@ -1,77 +1,3 @@
-# from cryptography.hazmat.primitives import hashes
-# from cryptography.hazmat.primitives.asymmetric import padding
-# from cryptography.hazmat.primitives import serialization
-# from pymongo import MongoClient
-
-# # MongoDB Connection
-# client = MongoClient("mongodb://localhost:27017/")
-# db = client["digital_signature_db"]
-# students_collection = db["students"]
-
-# def verify_signature(student_id, message, signature):
-#     """
-#     Verify a digital signature using the student's public key from MongoDB.
-
-#     Args:
-#         student_id (str): The ID of the student.
-#         message (bytes): The original message that was signed.
-#         signature (bytes): The digital signature to verify.
-
-#     Returns:
-#         bool: True if the signature is valid, False otherwise.
-#     """
-#     try:
-#         # Retrieve student's public key from MongoDB
-#         student_data = students_collection.find_one({"student_id": student_id})
-        
-#         if not student_data:
-#             print(f"Student '{student_id}' not found in MongoDB.")
-#             return False
-
-#         # Load public key from database
-#         public_key = serialization.load_pem_public_key(
-#             student_data["public_key"].encode('utf-8')
-#         )
-
-#         # Verify the signature
-#         public_key.verify(
-#             signature,
-#             message,
-#             padding.PSS(
-#                 mgf=padding.MGF1(hashes.SHA256()),
-#                 salt_length=padding.PSS.MAX_LENGTH
-#             ),
-#             hashes.SHA256()
-#         )
-        
-#         print(f"Signature is valid for {student_id}.")
-#         return True
-
-#     except Exception as e:
-#         print(f"Signature verification failed for {student_id}: {e}")
-#         return False
-
-# # Example: Verify a student's signature from `signature.bin`
-# if __name__ == "__main__":
-#     student_id = "Student2"
-#     message = b"Authenticate Student2"
-
-#     try:
-#         # Load signature from file (ensure this matches what was generated during signing)
-#         with open("signature.bin", "rb") as sig_file:
-#             signature = sig_file.read()
-
-#         # Verify the signature
-#         is_valid = verify_signature(student_id, message, signature)
-
-#         if is_valid:
-#             print("Message verification completed successfully.")
-#         else:
-#             print("Message verification failed.")
-
-#     except FileNotFoundError:
-#         print("Signature file not found. Ensure 'signature.bin' exists.")
-
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
@@ -82,28 +8,7 @@ from PIL import Image
 from io import BytesIO
 import os
 
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import serialization, hashes
-import os
-
-KEYS_DIR = "keys"
-
-def verify_signature(student_id, message, signature):
-    try:
-        with open(f"{KEYS_DIR}/{student_id}_public.pem", "rb") as key_file:
-            public_key = serialization.load_pem_public_key(key_file.read())
-
-        public_key.verify(
-            signature,
-            message,
-            padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
-            hashes.SHA256()
-        )
-        return True
-    except Exception:
-        return False
-
-
+SIGNATURES_DIR = "signatures"  # Use the same directory for all signature-related files
 
 # MongoDB Connection - Make sure this is defined
 client = MongoClient("mongodb+srv://ritwiksuneliya:Ritwik123@cluster0.4o02p.mongodb.net/attendance-system?retryWrites=true&w=majority")
@@ -116,14 +21,14 @@ def verify_signature(student_id, message, signature):
     """
     try:
         # Load the stored signature image
-        stored_signature_path = f"signatures/{student_id}_signature.png"
+        stored_signature_path = f"{SIGNATURES_DIR}/{student_id}_signature.png"
         if not os.path.exists(stored_signature_path):
             print(f"No stored signature found for {student_id}")
             return False
             
         # Convert the new signature bytes to an image
         new_sig_image = Image.open(BytesIO(message))
-        new_sig_temp_path = f"temp_new_signature.png"
+        new_sig_temp_path = f"{SIGNATURES_DIR}/temp_new_signature.png"
         new_sig_image.save(new_sig_temp_path)
         
         # Load both images in grayscale

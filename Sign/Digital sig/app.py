@@ -17,6 +17,8 @@ from verify import verify_signature
 
 app = Flask(__name__)
 
+SIGNATURES_DIR = "signatures"  # Define a single directory for all signature-related files
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -38,8 +40,8 @@ def sign_signature_route():
         generate_and_store_keys(student_id)
         
         # Save the signature image
-        os.makedirs('signatures', exist_ok=True)
-        signature_path = f"signatures/{student_id}_signature.png"
+        os.makedirs(SIGNATURES_DIR, exist_ok=True)
+        signature_path = f"{SIGNATURES_DIR}/{student_id}_signature.png"
         
         # Convert to image and save
         image = Image.open(BytesIO(image_bytes))
@@ -50,7 +52,7 @@ def sign_signature_route():
         
         if digital_signature:
             # Save the digital signature
-            signature_file_path = f"signatures/{student_id}_digital_signature.bin"
+            signature_file_path = f"{SIGNATURES_DIR}/{student_id}_digital_signature.bin"
             with open(signature_file_path, "wb") as sig_file:
                 sig_file.write(digital_signature)
             
@@ -76,12 +78,12 @@ def verify_signature_route():
         image_bytes = base64.b64decode(image_data)
         
         # Check if the student has a stored signature
-        signature_path = f"signatures/{student_id}_signature.png"
+        signature_path = f"{SIGNATURES_DIR}/{student_id}_signature.png"
         if not os.path.exists(signature_path):
             return jsonify({'valid': False, 'error': 'No signature on file for this student'})
            
         # Load the stored digital signature
-        signature_file_path = f"signatures/{student_id}_digital_signature.bin"
+        signature_file_path = f"{SIGNATURES_DIR}/{student_id}_digital_signature.bin"
         if not os.path.exists(signature_file_path):
             return jsonify({'valid': False, 'error': 'No digital signature on file for this student'})
             
@@ -99,13 +101,13 @@ def verify_signature_route():
 
 @app.route('/signatures/<path:filename>')
 def serve_signature(filename):
-    return send_from_directory('signatures', filename)
+    return send_from_directory(SIGNATURES_DIR, filename)
 
 def open_browser():
     webbrowser.open_new('http://127.0.0.1:5500/')
 
 if __name__ == '__main__':
-    os.makedirs('signatures', exist_ok=True)
+    os.makedirs(SIGNATURES_DIR, exist_ok=True)
     Timer(1.0, open_browser).start()
     app.run(debug=True, host='0.0.0.0', port=5500)
 
