@@ -652,6 +652,13 @@ const styles = {
   report: {
     textAlign: "center",
     marginBottom: "20px",
+    padding: "10px",
+    border: "1px solid #ddd",
+    borderRadius: "4px",
+    backgroundColor: "#f9f9f9",
+    width: "100%",
+    maxWidth: "600px",
+    margin: "0 auto", 
   }
 };
 

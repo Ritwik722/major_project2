@@ -165,29 +165,38 @@ function StudentRegistration() {
             const formDataToSend = new FormData();
             formDataToSend.append('file', file);
             formDataToSend.append('studentId', formData.enrollmentNumber);
-
-            const response = await fetch('http://localhost:5000/api/upload-photo', {
+    
+            const response = await fetch('/api/students/upload-photo', {  // Updated endpoint path
                 method: 'POST',
                 body: formDataToSend
             });
-
+    
             if (!response.ok) {
                 const errorData = await response.text();
                 throw new Error(errorData || 'Failed to upload photo');
             }
-
-            setFormData((prev) => ({
+    
+            const result = await response.json();
+    
+            // Update the form data with the file path from the server
+            setFormData(prev => ({
                 ...prev,
-                [type]: { file, preview: dataUri }
+                [type]: {
+                    file,
+                    preview: dataUri,
+                    path: result.file.path
+                }
             }));
+    
+            return result.file.path;  // Return the file path for further use if needed
+    
         } catch (error) {
             console.error(`${type} processing failed:`, error);
             alert(`Error processing ${type}: ${error.message}`);
         } finally {
-            setIsCameraActive((prev) => ({ ...prev, [type]: false }));
+            setIsCameraActive(prev => ({ ...prev, [type]: false }));
         }
     };
-
     // Update saveSignature function to handle errors better
     const saveSignature = async () => {
         try {
@@ -324,8 +333,8 @@ function StudentRegistration() {
             // Prepare registration payload
             const registrationPayload = {
                 ...formData,
-                studentPhoto: formData.studentPhoto?.preview,
-                digitalSignature: formData.digitalSignature?.preview,
+                photo: formData.studentPhoto?.path,  // Use the stored file path
+                signature: formData.digitalSignature?.path,  // Use the stored file path
                 publicKey: formData.publicKey
             };
 
