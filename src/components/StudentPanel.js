@@ -320,15 +320,15 @@ function StudentRegistration() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Verify signature before submission if available
-            if (formData.digitalSignature?.preview) {
-                try {
-                    await verifySignature(formData.digitalSignature.preview);
-                } catch (error) {
-                    // Continue even if verification fails or endpoint isn't available
-                    console.warn('Signature verification skipped:', error.message);
-                }
-            }
+            // // Verify signature before submission if available
+            // if (formData.digitalSignature?.path) {
+            //     try {
+            //         await verifySignature(formData.digitalSignature.path);
+            //     } catch (error) {
+            //         // Continue even if verification fails or endpoint isn't available
+            //         console.warn('Signature verification skipped:', error.message);
+            //     }
+            // }
 
             // Prepare registration payload
             const registrationPayload = {

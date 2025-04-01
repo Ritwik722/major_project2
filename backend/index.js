@@ -3,6 +3,8 @@ const cors = require('cors');
 const app = express();
 const studentRoutes = require('./routes/studentRoutes');
 
+
+
 // Add middleware
 app.use(cors());
 app.use(express.json());

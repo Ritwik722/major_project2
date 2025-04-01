@@ -4,46 +4,46 @@ const bcrypt = require('bcryptjs');
 const studentSchema = new mongoose.Schema({
   enrollmentNumber: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
   },
   name: {
     type: String,
-    required: true,
+    required: false,
   },
   email: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
   },
   password: {
     type: String,
-    required: true,
+    required: false,
   },
   phoneNumber: {
     type: String,
-    required: true,
+    required: false,
   },
   gender: {
     type: String,
-    required: true,
+    required: false,
     enum: ['male', 'female', 'other'],
   },
   department: {
     type: String,
-    required: true,
+    required: false,
   },
   course: {
     type: String,
-    required: true,
+    required: false,
   },
   year: {
     type: String,
-    required: true,
+    required: false,
   },
   section: {
     type: String,
-    required: true,
+    required: false,
   },
   photo: {
     type: String,
@@ -55,16 +55,16 @@ const studentSchema = new mongoose.Schema({
   },
   student_id: {
     type: String,
-    required: true,
+    required: false,
     unique: true
   },
   public_key: {
     type: String,
-    required: true
+    required: false
   },
   private_key: {
     type: String,
-    required: true
+    required: false
   },
   signature_path: String,
   digital_signature: Buffer

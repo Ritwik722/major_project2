@@ -19,22 +19,27 @@ const storage = multer.diskStorage({
     }
 });
 
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (extname && mimetype) {
+        return cb(null, true);
+    }
+    cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
+};
+
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 100 * 1024 * 1024 // 5MB limit
+        fileSize: 100 * 1024 * 1024, // 100MB limit
+        fieldSize: 100 * 1024 * 1024 // 100MB limit for form fields
     },
-    fileFilter: function (req, file, cb) {
-        const allowedTypes = /jpeg|jpg|png/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-
-        if (extname && mimetype) {
-            return cb(null, true);
-        }
-        cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
-    }
+    fileFilter: fileFilter
 });
+
+
 
 exports.uploadFile = (req, res) => {
     const uploadSingle = upload.single('file');
@@ -58,7 +63,7 @@ exports.uploadFile = (req, res) => {
             message: 'File uploaded successfully',
             file: {
                 filename: req.file.filename,
-                path: req.file.path
+                path: `/uploads/${req.file.filename}`
             }
         });
     });
