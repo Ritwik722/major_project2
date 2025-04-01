@@ -33,15 +33,72 @@ function StudentRegistration() {
     const [signaturePadInstance, setSignaturePadInstance] = useState(null);
     const canvasRef = useRef(null);
 
+    // Add a state to track if the canvas is ready
+    const [isCanvasReady, setIsCanvasReady] = useState(false);
+
+    // Update resizeCanvas function
+    const resizeCanvas = () => {
+        if (!canvasRef.current) return;
+        
+        const canvas = canvasRef.current;
+        const parent = canvas.parentElement;
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        
+        // Set canvas size based on parent container
+        canvas.width = parent.clientWidth * ratio;
+        canvas.height = parent.clientHeight * ratio;
+        canvas.style.width = `${parent.clientWidth}px`;
+        canvas.style.height = `${parent.clientHeight}px`;
+        
+        const context = canvas.getContext("2d");
+        context.scale(ratio, ratio);
+    };
+
+    // Update SignaturePad initialization
     useEffect(() => {
-        if (canvasRef.current && !signaturePadInstance) {
-            const pad = new SignaturePad(canvasRef.current, {
-                backgroundColor: 'rgba(255, 255, 255, 0)',
-                penColor: 'rgb(0, 0, 0)'
+        let pad = null;
+
+        const initializeSignaturePad = () => {
+            if (!canvasRef.current || !isCanvasReady) return;
+
+            // Clear any existing instance
+            if (signaturePadInstance) {
+                signaturePadInstance.off();
+            }
+
+            resizeCanvas();
+            
+            pad = new SignaturePad(canvasRef.current, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(0, 0, 0)',
+                minWidth: 1,
+                maxWidth: 2.5,
+                velocityFilterWeight: 0.7,
             });
+            
             setSignaturePadInstance(pad);
-        }
-    }, [canvasRef, signaturePadInstance]);
+        };
+
+        initializeSignaturePad();
+
+        const handleResize = () => {
+            resizeCanvas();
+            if (pad) {
+                const data = pad.toData();
+                pad.clear();
+                pad.fromData(data);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (pad) {
+                pad.off();
+            }
+        };
+    }, [isCanvasReady]); // Only re-run when canvas ready state changes
 
     // Load saved form data from localStorage
     useEffect(() => {
@@ -101,7 +158,7 @@ function StudentRegistration() {
         }
     };
 
-    // Enhanced photo handler with cryptographic integration
+    // Simplified handleTakePhoto function
     const handleTakePhoto = async (type, dataUri) => {
         try {
             const file = dataUriToFile(dataUri);
@@ -109,60 +166,45 @@ function StudentRegistration() {
             formDataToSend.append('file', file);
             formDataToSend.append('studentId', formData.enrollmentNumber);
 
-            // Unified API call handler
-            const processRequest = async (url, body) => {
-                const response = await fetch(url, body);
-                const contentType = response.headers.get("content-type");
-                
-                if (!response.ok) {
-                    const errorData = contentType?.includes('application/json') 
-                        ? await response.json()
-                        : { message: await response.text() };
-                    throw new Error(errorData.message || 'Request failed');
-                }
-                
-                return contentType?.includes('application/json') 
-                    ? response.json()
-                    : response.text();
-            };
+            const response = await fetch('http://localhost:5000/api/upload-photo', {
+                method: 'POST',
+                body: formDataToSend
+            });
 
-            if (type === 'studentPhoto') {
-                await processRequest('http://localhost:5000/api/upload-photo', {
-                    method: 'POST',
-                    body: formDataToSend
-                });
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(errorData || 'Failed to upload photo');
             }
 
-            // Generate keys on first photo upload
-            if (!formData.publicKey) {
-                try {
-                    const keys = await processRequest('http://localhost:5000/api/generate-keys', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ studentId: formData.enrollmentNumber })
-                    });
-                    
-                    setFormData(prev => ({
-                        ...prev,
-                        publicKey: keys.publicKey
-                    }));
-                } catch (error) {
-                    console.error('Failed to generate keys:', error);
-                    // Continue without keys if the endpoint isn't available
-                }
-            }
-
-            // Update state after successful operations
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 [type]: { file, preview: dataUri }
             }));
-            
         } catch (error) {
             console.error(`${type} processing failed:`, error);
             alert(`Error processing ${type}: ${error.message}`);
         } finally {
-            setIsCameraActive(prev => ({ ...prev, [type]: false }));
+            setIsCameraActive((prev) => ({ ...prev, [type]: false }));
+        }
+    };
+
+    // Update saveSignature function to handle errors better
+    const saveSignature = async () => {
+        try {
+            if (!signaturePadInstance) {
+                throw new Error('Signature pad not initialized');
+            }
+            
+            if (signaturePadInstance.isEmpty()) {
+                throw new Error('Please draw your signature first');
+            }
+
+            const dataUrl = signaturePadInstance.toDataURL('image/png');
+            await handleTakePhoto('digitalSignature', dataUrl);
+            signaturePadInstance.clear();
+            
+        } catch (error) {
+            alert(error.message);
         }
     };
 
@@ -325,39 +367,50 @@ function StudentRegistration() {
         }
     };
 
-    // Updated signature capture component
+    // Update renderSignaturePad function
     const renderSignaturePad = () => (
         <div className="signature-section">
-            <canvas 
-                ref={canvasRef} 
-                width={500} 
-                height={200}
-                style={{
-                    border: '1px solid #ccc',
+            <div 
+                style={{ 
+                    border: '2px solid #ccc', 
                     borderRadius: '4px',
-                    backgroundColor: '#f8f9fa'
+                    backgroundColor: '#fff',
+                    margin: '10px 0',
+                    width: '100%',
+                    maxWidth: '600px',
+                    height: '300px', // Fixed height container
+                    position: 'relative'
                 }}
-            />
+                onMouseEnter={() => setIsCanvasReady(true)} // Initialize when user interacts
+            >
+                <canvas
+                    ref={canvasRef}
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        touchAction: 'none',
+                        cursor: 'crosshair'
+                    }}
+                />
+            </div>
             <div className="signature-controls">
                 <button
                     type="button"
                     onClick={() => signaturePadInstance?.clear()}
+                    className="button"
                     style={{ marginRight: '10px' }}
                 >
-                    Clear Signature
+                    Clear
                 </button>
                 <button
                     type="button"
-                    onClick={async () => {
-                        if (signaturePadInstance && !signaturePadInstance.isEmpty()) {
-                            const dataUrl = signaturePadInstance.toDataURL();
-                            await handleTakePhoto('digitalSignature', dataUrl);
-                        } else {
-                            alert('Please draw your signature first');
-                        }
-                    }}
+                    onClick={saveSignature}
+                    className="button"
                 >
-                    Save Signature
+                    Save
                 </button>
             </div>
         </div>

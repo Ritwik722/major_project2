@@ -6,16 +6,15 @@ function TeacherPanel({ onLogin }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     password: '',
-    document: null,
   });
   const [error, setError] = useState('');
   const [token, setToken] = useState('');
 
   const handleInputChange = (e) => {
-    const { name, value, files } = e.target;
+    const { name, value } = e.target;
     setFormData((prevState) => ({
       ...prevState,
-      [name]: files ? files[0] : value,
+      [name]: value,
     }));
     setError('');
   };
@@ -40,53 +39,23 @@ function TeacherPanel({ onLogin }) {
     }
   };
 
-  // Handle document upload API
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    if (!formData.document) {
-      setError('Please select a document to upload.');
-      return;
-    }
-
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('document', formData.document);
-
-      const response = await axios.post('http://localhost:5000/api/teachers/upload-document', 
-        formDataToSend, 
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-
-      alert(response.data.message);
-      setError('');
-    } catch (error) {
-      setError(error.response?.data?.message || 'Document upload failed.');
-    }
-  };
-
   return (
     <div className="teacher-panel">
-      <h2>{loggedIn ? 'Upload Teaching Document' : 'Teacher Login'}</h2>
+      <h2>{loggedIn ? 'Teacher Panel' : 'Teacher Login'}</h2>
 
       {error && <div className="error-message">{error}</div>}
 
-      <form onSubmit={loggedIn ? handleUpload : handleLogin}>
+      <form onSubmit={loggedIn ? undefined : handleLogin}>
         {loggedIn ? (
           <div>
-            <label htmlFor="document">Upload PDF/DOC (Teaching Materials)</label>
-            <input
-              type="file"
-              id="document"
-              name="document"
-              onChange={handleInputChange}
-              accept=".pdf,.doc,.docx"
-              required
-            />
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = 'https://8c24-14-139-250-92.ngrok-free.app/';
+              }}
+            >
+              Upload Document
+            </button>
           </div>
         ) : (
           <>
@@ -115,7 +84,7 @@ function TeacherPanel({ onLogin }) {
           </>
         )}
 
-        <button type="submit">{loggedIn ? 'Upload Document' : 'Login'}</button>
+        {!loggedIn && <button type="submit">Login</button>}
       </form>
 
       {loggedIn && (
