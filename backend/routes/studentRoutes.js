@@ -4,6 +4,9 @@ const studentController = require('../controllers/studentController');
 const authController = require('../controllers/authController');
 const auth = require('../middleware/auth');
 const Student = require('../models/Student');
+const uploadController = require('../controllers/uploadController');
+
+router.post('/upload-photo', uploadController.uploadFile);
 
 router.post('/register', studentController.registerStudent);
 router.post('/login', studentController.loginStudent);

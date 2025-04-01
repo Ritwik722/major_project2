@@ -47,9 +47,11 @@ const studentSchema = new mongoose.Schema({
   },
   photo: {
     type: String,
+    required: false
   },
   signature: {
     type: String,
+    required: false
   },
   student_id: {
     type: String,
