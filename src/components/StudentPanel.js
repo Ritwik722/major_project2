@@ -260,6 +260,19 @@ function StudentRegistration() {
 
     // Validation for step 1
     const validateStep1 = () => {
+        // Check if enrollment number exists and is not empty
+        if (!formData.enrollmentNumber || formData.enrollmentNumber.trim() === '') {
+            alert('Enrollment number is required');
+            return false;
+        }
+
+        // Add enrollment number format validation (adjust pattern as needed)
+        const enrollmentPattern = /^[A-Za-z0-9]+$/;
+        if (!enrollmentPattern.test(formData.enrollmentNumber)) {
+            alert('Invalid enrollment number format. Only alphanumeric characters are allowed.');
+            return false;
+        }
+        
         const requiredFields = [
             'enrollmentNumber', 'name', 'email', 'phoneNumber', 'gender', 
             'course', 'department', 'year', 'section'
@@ -332,6 +345,7 @@ function StudentRegistration() {
 
             // Prepare registration payload
             const registrationPayload = {
+                student_id: formData.enrollmentNumber, // Explicitly set student_id
                 ...formData,
                 photo: formData.studentPhoto?.path,  // Use the stored file path
                 signature: formData.digitalSignature?.path,  // Use the stored file path
