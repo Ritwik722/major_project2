@@ -51,7 +51,7 @@ function TeacherPanel({ onLogin }) {
             <button
               type="button"
               onClick={() => {
-                window.location.href = 'https://8c24-14-139-250-92.ngrok-free.app/';
+                window.location.href = 'https://375e-2405-201-300a-d81e-60fd-e0ed-233b-fb42.ngrok-free.app/';
               }}
             >
               Upload Document

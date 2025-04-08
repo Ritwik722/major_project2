@@ -1,52 +1,74 @@
 // services/SignatureService.js
 const Jimp = require('jimp');
-const crypto = require('crypto');
 const Student = require('../models/Student');
+const path = require('path');
+const fs = require('fs');
 
 class SignatureService {
   async verifySignature(studentId, imageBuffer) {
     try {
-      const student = await Student.findOne({ student_id: studentId });
-      if (!student) throw new Error('Student not found');
+      // Find student by enrollment number
+      const student = await Student.findOne({ enrollmentNumber: studentId });
+      if (!student) {
+        throw new Error('Student not found');
+      }
 
-      // Cryptographic Verification
-      const verifier = crypto.createVerify('SHA256');
-      verifier.update(imageBuffer);
-      const isValid = verifier.verify(
-        student.public_key,
-        student.digital_signature,
-        'base64'
-      );
+      if (!student.signature) {
+        throw new Error('No signature on file for this student');
+      }
 
-      // Visual Verification
+      // Visual Verification using image comparison
       const similarity = await this.compareSignatures(
-        student.signature_path, 
+        path.join(__dirname, '..', student.signature.replace(/^\//, '')), 
         imageBuffer
       );
 
-      return { isValid, similarity };
+      // Consider a signature valid if similarity is above 70%
+      const isValid = similarity > 0.7;
+
+      return { 
+        isValid, 
+        similarity,
+        message: isValid ? 'Signature matches' : 'Signature does not match'
+      };
     } catch (error) {
       throw new Error(`Verification failed: ${error.message}`);
     }
   }
 
   async compareSignatures(storedPath, newBuffer) {
-    const [storedImg, newImg] = await Promise.all([
-      Jimp.read(storedPath),
-      Jimp.read(newBuffer)
-    ]);
-    
-    storedImg.resize(300, 150).grayscale();
-    newImg.resize(300, 150).grayscale();
+    try {
+      // Read stored image
+      const storedBuffer = fs.readFileSync(storedPath);
+      
+      // Create Jimp images from buffers
+      const storedImg = await Jimp.read(storedBuffer);
+      const newImg = await Jimp.read(newBuffer);
+      
+      // Normalize both images to same size and convert to grayscale
+      storedImg.resize(300, 150).grayscale();
+      newImg.resize(300, 150).grayscale();
 
-    let matchingPixels = 0;
-    storedImg.scan(0, 0, storedImg.bitmap.width, storedImg.bitmap.height, (x, y, idx) => {
-      if (Math.abs(storedImg.bitmap.data[idx] - newImg.bitmap.data[idx]) < 25) {
-        matchingPixels++;
+      let matchingPixels = 0;
+      const totalPixels = 300 * 150;  // Based on our resize dimensions
+
+      // Compare each pixel
+      for (let x = 0; x < 300; x++) {
+        for (let y = 0; y < 150; y++) {
+          const pixel1 = Jimp.intToRGBA(storedImg.getPixelColor(x, y));
+          const pixel2 = Jimp.intToRGBA(newImg.getPixelColor(x, y));
+          
+          // Compare grayscale values (since we converted to grayscale, R=G=B)
+          if (Math.abs(pixel1.r - pixel2.r) < 25) {
+            matchingPixels++;
+          }
+        }
       }
-    });
 
-    return matchingPixels / (storedImg.bitmap.width * storedImg.bitmap.height);
+      return matchingPixels / totalPixels;
+    } catch (error) {
+      throw new Error(`Image comparison failed: ${error.message}`);
+    }
   }
 }
 

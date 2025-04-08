@@ -1,70 +1,157 @@
 import React, { useState, useEffect } from "react";
 
-const performFaceRecognition = async (file) => {
-  const formData = new FormData();
-  formData.append("image", file);
-  formData.append("studentId", selectedStudent.enrollmentNumber);
-
+const verifySignature = async (student) => {
   try {
-    const response = await fetch("http://localhost:5000/api/verify-face", {
-      method: "POST",
-      body: formData,
-    });
-    
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
-    
-    // Add cryptographic verification
-    const sigResponse = await fetch("http://localhost:5000/api/verify-signature", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    // If the signature is a file path, fetch it first
+    let signatureData = student.signature;
+    if (typeof student.signature === 'string' && student.signature.includes('uploads/')) {
+      signatureData = student.signature; // Keep using the path since backend handles it
+    }
+
+    const response = await fetch('http://localhost:5000/api/signature/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        studentId: selectedStudent.enrollmentNumber,
-        signatureData: result.signature
-      })
+        studentId: student.enrollmentNumber,
+        signature: signatureData
+      }),
     });
-    
-    const sigResult = await sigResponse.json();
-    return { 
-      ...result,
-      signatureValid: sigResult.valid,
-      similarity: sigResult.similarity
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to verify signature');
+    }
+
+    const result = await response.json();
+    return {
+      success: result.success,
+      isValid: result.isValid,
+      similarity: result.similarity,
+      message: result.message
     };
-    
   } catch (error) {
-    throw new Error(error.message);
+    throw new Error(`Signature verification failed: ${error.message}`);
   }
 };
 
 const handleCaptureSignature = async (e) => {
   const file = e.target.files[0];
-  if (!file) return;
+  if (!file) {
+    setError("Please select a signature file to upload.");
+    return;
+  }
 
   try {
+    // Create form data for upload
     const formData = new FormData();
-    formData.append("signature", file);
-    formData.append("studentId", selectedStudent.enrollmentNumber);
+    formData.append('signature', file);
+    formData.append('studentId', selectedStudent.enrollmentNumber);
 
-    const response = await fetch("http://localhost:5000/api/upload-signature", {
-      method: "POST",
+    // Upload the signature first
+    const uploadResponse = await fetch('http://localhost:5000/api/signature/upload', {
+      method: 'POST',
       body: formData
     });
 
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.json();
+      throw new Error(error.message || 'Failed to upload signature');
+    }
 
-    // Update local state with verification results
+    const uploadResult = await uploadResponse.json();
+    
+    // Update student with new signature path
+    const updateResponse = await fetch(`http://localhost:5000/api/students/update/${selectedStudent.enrollmentNumber}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        ...selectedStudent,
+        signature: uploadResult.filePath
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error('Failed to update student signature');
+    }
+
+    // Now verify the uploaded signature
+    const verifyResponse = await fetch('http://localhost:5000/api/signature/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        studentId: selectedStudent.enrollmentNumber,
+        signature: uploadResult.filePath
+      })
+    });
+
+    if (!verifyResponse.ok) {
+      const error = await verifyResponse.json();
+      throw new Error(error.message || 'Verification failed');
+    }
+
+    const verifyResult = await verifyResponse.json();
+
+    // Update UI
+    setSuccessMessage(`Signature ${verifyResult.isValid ? 'verified' : 'failed verification'} (${Math.round(verifyResult.similarity * 100)}% match)`);
     setSelectedStudent(prev => ({
       ...prev,
-      signature: URL.createObjectURL(file),
-      signatureValid: result.valid,
-      similarityScore: result.similarity
+      signature: uploadResult.filePath
     }));
-    
-    setSuccessMessage(`Signature uploaded (${Math.round(result.similarity*100)}% match)`);
+
+    // Refresh student list
+    if (selectedRoom) {
+      const range = selectedRoom.range.split('-').map(Number);
+      fetchStudents(range);
+    }
     
   } catch (error) {
     setError(error.message);
+  }
+};
+
+const verifyPhoto = async (student) => {
+  try {
+    let imageFile;
+    // Convert photo to File object
+    if (student.photo.startsWith('data:image')) {
+      const response = await fetch(student.photo);
+      const blob = await response.blob();
+      imageFile = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    } else {
+      const response = await fetch(student.photo);
+      const blob = await response.blob();
+      imageFile = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    }
+
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    formData.append('enrollmentNumber', student.enrollmentNumber);
+
+    const response = await fetch('http://localhost:5000/api/students/verify-photo', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message);
+    }
+
+    const result = await response.json();
+    return {
+      success: result.success,
+      message: result.message,
+      isMatch: result.isMatch
+    };
+  } catch (error) {
+    throw new Error(`Photo verification failed: ${error.message}`);
   }
 };
 
@@ -243,22 +330,6 @@ const AttendanceSheet = () => {
     }
   };
 
-  const handleCaptureSignature = async (e) => {
-    const file = e.target.files[0];
-    if (!file) {
-      setError("Please select a signature file to upload.");
-      return;
-    }
-
-    try {
-      const result = await uploadSignature(file);
-      setSuccessMessage(result.message);
-      setSelectedStudent((prev) => ({ ...prev, signature: URL.createObjectURL(file) }));
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
   const deleteStudent = async (enrollmentNumber) => {
     if (window.confirm('Are you sure you want to delete this student?')) {
       try {
@@ -350,11 +421,28 @@ const AttendanceSheet = () => {
               <td style={styles.cell}>{student.department}</td>
               <td style={styles.cell}>
                 {student.photo ? (
-                  <img
-                    src={student.photo}
-                    alt="Student"
-                    style={styles.image}
-                  />
+                  <div>
+                    <img
+                      src={student.photo}
+                      alt="Student"
+                      style={styles.image}
+                    />
+                    <button
+                      style={styles.verifyButton}
+                      onClick={async () => {
+                        try {
+                          const result = await verifyPhoto(student);
+                          setSuccessMessage(
+                            `Photo verification: ${result.isMatch ? 'Successful' : 'Failed'} - ${result.message}`
+                          );
+                        } catch (error) {
+                          setError(error.message);
+                        }
+                      }}
+                    >
+                      Verify Photo
+                    </button>
+                  </div>
                 ) : (
                   <div>
                     <button
@@ -368,11 +456,28 @@ const AttendanceSheet = () => {
               </td>
               <td style={styles.cell}>
                 {student.signature ? (
-                  <img
-                    src={student.signature}
-                    alt="Signature"
-                    style={styles.image}
-                  />
+                  <div>
+                    <img
+                      src={student.signature}
+                      alt="Signature"
+                      style={styles.image}
+                    />
+                    <button
+                      style={styles.verifyButton}
+                      onClick={async () => {
+                        try {
+                          const result = await verifySignature(student);
+                          setSuccessMessage(
+                            `Signature verification: ${result.isValid ? 'Valid' : 'Invalid'} (${Math.round(result.similarity * 100)}% match)`
+                          );
+                        } catch (error) {
+                          setError(error.message);
+                        }
+                      }}
+                    >
+                      Verify Sign
+                    </button>
+                  </div>
                 ) : (
                   <div>
                     <button
@@ -659,6 +764,18 @@ const styles = {
     width: "100%",
     maxWidth: "600px",
     margin: "0 auto", 
+  },
+  verifyButton: {
+    padding: '3px 8px',
+    margin: '5px',
+    backgroundColor: '#17a2b8',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    display: 'block',
+    width: '100%',
   }
 };
 

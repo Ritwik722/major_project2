@@ -95,10 +95,10 @@ const App = () => {
   // Render navigation buttons
   const renderNavigationButtons = () => {
     const buttons = [
-      { label: "Student Panel", value: "student" },
+      { label: "REGISTER", value: "student" },
       { label: "Teacher Panel", value: "teacher" },
       { label: "Room List", value: "roomlist" },
-      { label: "Attendance Sheet", value: "attendance" },
+      { label: "Student Details ", value: "attendance" },
     ];
 
     return buttons.map((button) => (
