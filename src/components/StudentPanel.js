@@ -139,8 +139,8 @@ function StudentRegistration() {
         localStorage.setItem('formData', JSON.stringify(updatedFormData));
     };
 
-    // Enhanced data URI to File conversion with error handling
-    const dataUriToFile = (dataUri) => {
+    // Enhanced data URI to File conversion with better filenames
+    const dataUriToFile = (dataUri, type) => {
         try {
             const byteString = atob(dataUri.split(',')[1]);
             const mimeString = dataUri.split(',')[0].split(':')[1].split(';')[0];
@@ -151,45 +151,51 @@ function StudentRegistration() {
                 uintArray[i] = byteString.charCodeAt(i);
             }
 
-            return new File([uintArray], 'image.png', { type: mimeString });
+            // Create more meaningful filename using student ID and name
+            const safeStudentName = formData.name.replace(/[^a-zA-Z0-9]/g, '_');
+            const timestamp = new Date().getTime();
+            const fileName = `${formData.enrollmentNumber}_${safeStudentName}_${type}_${timestamp}.png`;
+            
+            return new File([uintArray], fileName, { type: mimeString });
         } catch (error) {
             console.error('Data URI conversion failed:', error);
             throw new Error('Invalid image format');
         }
     };
 
-    // Simplified handleTakePhoto function
+    // Updated handleTakePhoto function with improved file naming
     const handleTakePhoto = async (type, dataUri) => {
         try {
-            const file = dataUriToFile(dataUri);
+            const file = dataUriToFile(dataUri, type);
             const formDataToSend = new FormData();
             formDataToSend.append('file', file);
             formDataToSend.append('studentId', formData.enrollmentNumber);
-    
-            const response = await fetch('/api/students/upload-photo', {  // Updated endpoint path
+            formDataToSend.append('originalFilename', file.name);
+
+            const response = await fetch('/api/students/upload-photo', {
                 method: 'POST',
                 body: formDataToSend
             });
-    
+
             if (!response.ok) {
                 const errorData = await response.text();
                 throw new Error(errorData || 'Failed to upload photo');
             }
-    
+
             const result = await response.json();
-    
-            // Update the form data with the file path from the server
+
             setFormData(prev => ({
                 ...prev,
                 [type]: {
                     file,
                     preview: dataUri,
-                    path: result.file.path
+                    path: result.file.path,
+                    originalName: file.name
                 }
             }));
-    
-            return result.file.path;  // Return the file path for further use if needed
-    
+
+            return result.file.path;
+
         } catch (error) {
             console.error(`${type} processing failed:`, error);
             alert(`Error processing ${type}: ${error.message}`);
@@ -197,7 +203,73 @@ function StudentRegistration() {
             setIsCameraActive(prev => ({ ...prev, [type]: false }));
         }
     };
-    // Update saveSignature function to handle errors better
+
+    // New helper function for file uploads
+    const uploadFile = async (type, file, dataUri) => {
+        try {
+            const formDataToSend = new FormData();
+            formDataToSend.append('file', file);
+            formDataToSend.append('studentId', formData.enrollmentNumber);
+            formDataToSend.append('originalFilename', file.name);
+
+            const response = await fetch('/api/students/upload-photo', {
+                method: 'POST',
+                body: formDataToSend
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(errorData || 'Failed to upload file');
+            }
+
+            const result = await response.json();
+
+            setFormData(prev => ({
+                ...prev,
+                [type]: {
+                    ...prev[type],
+                    path: result.file.path
+                }
+            }));
+
+            return result.file.path;
+        } catch (error) {
+            console.error(`${type} upload failed:`, error);
+            alert(`Error uploading ${type}: ${error.message}`);
+        }
+    };
+
+    // Updated handleFileUpload with better naming
+    const handleFileUpload = (type, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Create a new file with better naming
+        const safeStudentName = formData.name.replace(/[^a-zA-Z0-9]/g, '_');
+        const timestamp = new Date().getTime();
+        const extension = file.name.split('.').pop();
+        const newFileName = `${formData.enrollmentNumber}_${safeStudentName}_${type}_${timestamp}.${extension}`;
+        
+        // Create a new File object with the modified name
+        const renamedFile = new File([file], newFileName, { type: file.type });
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFormData(prevState => ({
+                ...prevState,
+                [type]: {
+                    file: renamedFile,
+                    preview: reader.result,
+                    originalName: newFileName
+                }
+            }));
+            
+            // Upload the file immediately
+            uploadFile(type, renamedFile, reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const saveSignature = async () => {
         try {
             if (!signaturePadInstance) {
@@ -238,24 +310,6 @@ function StudentRegistration() {
             console.error('Verification failed:', error);
             throw error;
         }
-    };
-
-    // Handle file upload from disk
-    const handleFileUpload = (type, e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setFormData(prevState => ({
-                ...prevState,
-                [type]: {
-                    file: file,
-                    preview: reader.result
-                }
-            }));
-        };
-        reader.readAsDataURL(file);
     };
 
     // Validation for step 1
@@ -439,7 +493,7 @@ function StudentRegistration() {
         </div>
     );
 
-    // Modified renderCameraSection for digital signatures
+    // Modified renderCameraSection for digital signatures with filename display
     const renderCameraSection = (type) => {
         if (type === 'digitalSignature') {
             return renderSignaturePad();
@@ -493,6 +547,11 @@ function StudentRegistration() {
                                         margin: '10px 0' 
                                     }} 
                                 />
+                                {formData[type].originalName && (
+                                    <p className="file-name">
+                                        {formData[type].originalName}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -682,6 +741,9 @@ function StudentRegistration() {
                                 alt="Student" 
                                 style={{ width: '200px', height: '200px', objectFit: 'cover' }} 
                             />
+                            {formData.studentPhoto.originalName && (
+                                <p className="file-details">File: {formData.studentPhoto.originalName}</p>
+                            )}
                         </div>
                     )}
                 </div>
@@ -694,6 +756,9 @@ function StudentRegistration() {
                                 alt="Signature" 
                                 style={{ width: '200px', height: '100px', objectFit: 'contain' }} 
                             />
+                            {formData.digitalSignature.originalName && (
+                                <p className="file-details">File: {formData.digitalSignature.originalName}</p>
+                            )}
                         </div>
                     )}
                 </div>

@@ -1,5 +1,6 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Configure storage
 const storage = multer.diskStorage({
@@ -15,12 +16,24 @@ const storage = multer.diskStorage({
       uploadPath += 'documents/';
     }
     
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    
     cb(null, uploadPath);
   },
   filename: function(req, file, cb) {
-    // Create unique filename with timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Use original filename if provided
+    if (req.body.originalFilename) {
+      cb(null, req.body.originalFilename);
+    } else {
+      // Create unique filename with timestamp and student ID if available
+      const studentId = req.body.studentId || 'unknown';
+      const timestamp = Date.now();
+      const fileExt = path.extname(file.originalname);
+      cb(null, `${studentId}_${timestamp}${fileExt}`);
+    }
   }
 });
 

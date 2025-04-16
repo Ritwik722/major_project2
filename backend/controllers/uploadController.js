@@ -39,8 +39,6 @@ const upload = multer({
     fileFilter: fileFilter
 });
 
-
-
 exports.uploadFile = (req, res) => {
     const uploadSingle = upload.single('file');
 
@@ -57,13 +55,57 @@ exports.uploadFile = (req, res) => {
             });
         }
 
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No file uploaded'
+            });
+        }
+
         // File upload successful
         res.status(200).json({
             success: true,
             message: 'File uploaded successfully',
             file: {
+                originalname: req.file.originalname,
                 filename: req.file.filename,
-                path: `/uploads/${req.file.filename}`
+                path: `/uploads/${req.file.filename}`,
+                mimetype: req.file.mimetype,
+                size: req.file.size
+            }
+        });
+    });
+};
+
+// Add new endpoint for student photo upload
+exports.uploadStudentPhoto = (req, res) => {
+    const uploadPhoto = upload.single('studentPhoto');
+
+    uploadPhoto(req, res, function (err) {
+        if (err) {
+            return res.status(400).json({
+                success: false,
+                message: err instanceof multer.MulterError ? 
+                    `Upload error: ${err.message}` : err.message
+            });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No photo uploaded'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Student photo uploaded successfully',
+            file: {
+                originalname: req.file.originalname,
+                filename: req.file.filename,
+                path: `/uploads/photos/${req.file.filename}`,
+                mimetype: req.file.mimetype,
+                size: req.file.size
             }
         });
     });
